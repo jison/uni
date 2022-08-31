@@ -1,0 +1,230 @@
+package valuer
+
+import (
+	"reflect"
+	"testing"
+
+	"github.com/jison/uni/internal/errors"
+	"github.com/jison/uni/internal/reflecting"
+	"github.com/stretchr/testify/assert"
+)
+
+func Test_singleValue(t *testing.T) {
+	t.Run("SingleValue", func(t *testing.T) {
+		t.Run("error", func(t *testing.T) {
+			err := errors.Newf("this is an error")
+			r := SingleValue(reflect.ValueOf(err))
+			err2, ok := r.AsError()
+			assert.True(t, ok)
+			assert.Equal(t, err, err2)
+		})
+
+		t.Run("no error", func(t *testing.T) {
+			val := 123
+			res := SingleValue(reflect.ValueOf(val))
+			val2, ok := res.AsSingle()
+			assert.True(t, ok)
+			assert.Equal(t, reflect.ValueOf(val), val2)
+		})
+	})
+
+	t.Run("AsSingle", func(t *testing.T) {
+		val := 123
+		sv := &singleValue{val: reflect.ValueOf(val)}
+		val2, ok := sv.AsSingle()
+		assert.True(t, ok)
+		assert.Equal(t, reflect.ValueOf(val), val2)
+	})
+
+	t.Run("AsError", func(t *testing.T) {
+		val := 123
+		sv := &singleValue{val: reflect.ValueOf(val)}
+		err, ok := sv.AsError()
+		assert.False(t, ok)
+		assert.Nil(t, err)
+	})
+
+	t.Run("AsArray", func(t *testing.T) {
+		val := 123
+		sv := &singleValue{val: reflect.ValueOf(val)}
+		arr, ok := sv.AsArray()
+		assert.False(t, ok)
+		assert.Nil(t, arr)
+	})
+}
+
+func Test_errorValue(t *testing.T) {
+	t.Run("ErrorValue", func(t *testing.T) {
+		t.Run("error is nil", func(t *testing.T) {
+			ev := ErrorValue(nil)
+			val, ok := ev.AsSingle()
+			assert.True(t, ok)
+			assert.False(t, val.IsValid())
+		})
+
+		t.Run("error is not nil", func(t *testing.T) {
+			err := errors.Newf("this is an error")
+			ev := ErrorValue(err)
+			err2, ok := ev.AsError()
+			assert.True(t, ok)
+			assert.Equal(t, err, err2)
+		})
+	})
+
+	t.Run("AsSingle", func(t *testing.T) {
+		err := errors.Newf("this is an error")
+		ev := &errorValue{err: err}
+		val, ok := ev.AsSingle()
+		assert.False(t, ok)
+		assert.False(t, val.IsValid())
+	})
+
+	t.Run("AsError", func(t *testing.T) {
+		err := errors.Newf("this is an error")
+		ev := &errorValue{err: err}
+		err2, ok := ev.AsError()
+		assert.True(t, ok)
+		assert.Equal(t, err, err2)
+	})
+
+	t.Run("AsArray", func(t *testing.T) {
+		err := errors.Newf("this is an error")
+		ev := &errorValue{err: err}
+		arr, ok := ev.AsArray()
+		assert.False(t, ok)
+		assert.Nil(t, arr)
+	})
+}
+
+func Test_arrayValue(t *testing.T) {
+	t.Run("ArrayValue", func(t *testing.T) {
+		vals, _ := reflecting.ReflectValuesOf(123, "abc")
+		av := ArrayValue(vals)
+		vals2, ok := av.AsArray()
+		assert.True(t, ok)
+		assert.Equal(t, vals, vals2)
+	})
+
+	t.Run("AsSingle", func(t *testing.T) {
+		vals, _ := reflecting.ReflectValuesOf(123, "abc")
+		av := &arrayValue{arr: vals}
+		vals2, ok := av.AsSingle()
+		assert.False(t, ok)
+		assert.False(t, vals2.IsValid())
+	})
+
+	t.Run("AsError", func(t *testing.T) {
+		vals, _ := reflecting.ReflectValuesOf(123, "abc")
+		av := &arrayValue{arr: vals}
+		err, ok := av.AsError()
+		assert.False(t, ok)
+		assert.Nil(t, err)
+	})
+
+	t.Run("AsArray", func(t *testing.T) {
+		vals, _ := reflecting.ReflectValuesOf(123, "abc")
+		av := &arrayValue{arr: vals}
+		vals2, ok := av.AsArray()
+		assert.True(t, ok)
+		assert.Equal(t, vals, vals2)
+	})
+}
+
+func Test_lazyValue(t *testing.T) {
+	t.Run("LazyValue", func(t *testing.T) {
+		t.Run("function is nil", func(t *testing.T) {
+			lv := LazyValue(nil)
+			res, ok := lv.AsError()
+			assert.True(t, ok)
+			assert.NotNil(t, res)
+		})
+
+		t.Run("function is not nil", func(t *testing.T) {
+			lv := LazyValue(func() Value {
+				return SingleValue(reflect.ValueOf(1))
+			})
+			res, ok := lv.AsSingle()
+			assert.True(t, ok)
+			assert.Equal(t, reflect.ValueOf(1), res)
+		})
+	})
+
+	t.Run("AsSingle", func(t *testing.T) {
+		lv := lazyValue{f: func() Value {
+			return SingleValue(reflect.ValueOf(1))
+		}}
+		res, ok := lv.AsSingle()
+		assert.True(t, ok)
+		assert.Equal(t, reflect.ValueOf(1), res)
+	})
+
+	t.Run("AsError", func(t *testing.T) {
+		err := errors.Newf("this is an error")
+		lv := lazyValue{f: func() Value {
+			return ErrorValue(err)
+		}}
+		res, ok := lv.AsError()
+		assert.True(t, ok)
+		assert.Equal(t, err, res)
+	})
+
+	t.Run("AsArray", func(t *testing.T) {
+		vals, _ := reflecting.ReflectValuesOf(123, "abc")
+		lv := lazyValue{f: func() Value {
+			return ArrayValue(vals)
+		}}
+
+		res, ok := lv.AsArray()
+		assert.True(t, ok)
+		assert.Equal(t, vals, res)
+	})
+}
+
+func TestValuesOf(t *testing.T) {
+	t.Run("value", func(t *testing.T) {
+		vals := ValuesOf(123, "abc")
+		for i, val := range vals {
+			res, ok := val.AsSingle()
+			assert.True(t, ok)
+			if i == 0 {
+				assert.Equal(t, reflect.ValueOf(123), res)
+			} else {
+				assert.Equal(t, reflect.ValueOf("abc"), res)
+			}
+		}
+	})
+
+	t.Run("error", func(t *testing.T) {
+		err1 := errors.Newf("abc")
+		err2 := errors.Newf("def")
+
+		vals := ValuesOf(err1, err2)
+		for i, val := range vals {
+			res, ok := val.AsError()
+			assert.True(t, ok)
+			if i == 0 {
+				assert.Equal(t, err1, res)
+			} else {
+				assert.Equal(t, err2, res)
+			}
+		}
+	})
+
+	t.Run("array", func(t *testing.T) {
+		arr1 := []interface{}{123, "abc"}
+		arr2 := []interface{}{456, "def"}
+
+		vals := ValuesOf(arr1, arr2)
+		for i, val := range vals {
+			res, ok := val.AsArray()
+			assert.True(t, ok)
+			if i == 0 {
+				vals1, _ := reflecting.ReflectValuesOf(arr1...)
+				assert.Equal(t, vals1, res)
+			} else {
+				vals2, _ := reflecting.ReflectValuesOf(arr2...)
+				assert.Equal(t, vals2, res)
+			}
+		}
+	})
+}
