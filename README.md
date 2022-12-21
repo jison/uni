@@ -49,10 +49,6 @@ can only be executed in one goroutine at the same time
 go get github.com/jison/uni 
 ```
 
-## Usage
-
-you can find the sample codes in `example` folder
-
 ## Documentation
 
 see [docs/docs.md](docs/docs.md)
