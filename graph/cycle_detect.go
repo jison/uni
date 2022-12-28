@@ -107,10 +107,6 @@ func (s NodeSet) Del(node Node) {
 	delete(s, node)
 }
 
-func (s NodeSet) Len() int {
-	return len(s)
-}
-
 // FindCycles
 // see https://github.com/networkx/networkx/blob/main/networkx/algorithms/cycles.py#L98
 func FindCycles(g DirectedGraphView) []Cycle {

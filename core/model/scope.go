@@ -69,10 +69,6 @@ func (s *scope) Format(f fmt.State, c rune) {
 	}
 }
 
-func (s *scope) String() string {
-	return fmt.Sprintf("%v", s)
-}
-
 type globalScope struct{}
 
 var GlobalScope = &globalScope{}

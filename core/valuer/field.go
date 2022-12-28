@@ -17,9 +17,10 @@ type structField struct {
 }
 
 func (v *structFieldValuer) ValueOne(input Value) Value {
-	if _, ok := input.AsError(); ok {
-		return input
-	}
+	// input of ValueOne can not be an Error value
+	//if _, ok := input.AsError(); ok {
+	//	return input
+	//}
 
 	rVal, ok := input.AsSingle()
 	if !ok {

@@ -261,6 +261,10 @@ func (e *structError) As(target interface{}) bool {
 }
 
 func (e *structError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+
 	if e.mainError != nil {
 		return e.mainError
 	}

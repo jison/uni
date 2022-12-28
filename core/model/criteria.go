@@ -55,17 +55,17 @@ func (c *criteria) Equal(other interface{}) bool {
 	if !ok {
 		return false
 	}
+	if c == nil || o == nil {
+		return c == nil && o == nil
+	}
+
 	if c.Type() != o.Type() {
 		return false
 	}
 	if c.Name() != o.Name() {
 		return false
 	}
-	if c.Tags() != nil {
-		if !c.Tags().Equal(o.Tags()) {
-			return false
-		}
-	} else if o.Tags() != nil {
+	if !c.Tags().Equal(o.Tags()) {
 		return false
 	}
 
@@ -91,11 +91,11 @@ func (c *criteria) Format(fs fmt.State, r rune) {
 	_, _ = fmt.Fprint(fs, "}")
 }
 
-func (c *criteria) String() string {
-	return fmt.Sprintf("%v", c)
-}
-
 func (c *criteria) clone() *criteria {
+	if c == nil {
+		return nil
+	}
+
 	c2 := &criteria{
 		rType: c.rType,
 		tags:  c.tags.clone(),

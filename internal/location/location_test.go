@@ -120,6 +120,11 @@ func TestGetFuncLocation(t *testing.T) {
 			assert.Equal(t, tt.want.fileLine, l.FileLine())
 		})
 	}
+
+	t.Run("function is nil", func(t *testing.T) {
+		l := GetFuncLocation(nil)
+		assert.Nil(t, l)
+	})
 }
 
 func TestLocation_Format(t *testing.T) {
@@ -190,6 +195,11 @@ func TestGetCallerLocation(t *testing.T) {
 			assert.Equal(t, tt.want.funcName, l.Callee().FuncName())
 		})
 	}
+
+	t.Run("can not get call location", func(t *testing.T) {
+		loc := GetCallLocation(1000000)
+		assert.Nil(t, loc)
+	})
 }
 
 func TestCallLocation_Format(t *testing.T) {

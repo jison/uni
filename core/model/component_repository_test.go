@@ -52,6 +52,7 @@ func Test_componentRepository_ComponentsMatch(t *testing.T) {
 	tag2 := NewSymbol("tag2")
 	tag3 := NewSymbol("tag3")
 
+	//lint:ignore U1000 we need the field name to locate the field
 	type testStruct struct {
 		a int
 		b string
@@ -109,6 +110,9 @@ func Test_componentRepository_ComponentsMatch(t *testing.T) {
 		{"16", args{coms, criOf(&testStruct{}, ByName("name3"))}, []int{18}},
 		{"17", args{coms, criOf((*testInterface)(nil))}, []int{16, 17, 18}},
 		{"18", args{coms, criOf((*testInterface)(nil), ByTags(tag1))}, []int{15}},
+		{"19", args{coms, nil}, []int{}},
+		{"20", args{coms, criOf(wildcardType)}, []int{
+			0, 1, 2, 3, 4, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -129,11 +133,13 @@ func Test_componentRepository_ComponentsWithScope(t *testing.T) {
 	scope1 := NewScope("scope1")
 	scope2 := NewScope("scope2", scope1)
 	scope3 := NewScope("scope3")
+	scope4 := NewScope("scope4")
 
 	tag1 := NewSymbol("tag1")
 	tag2 := NewSymbol("tag2")
 	tag3 := NewSymbol("tag3")
 
+	//lint:ignore U1000 we need the field name to locate the field
 	type testStruct struct {
 		a int
 		b string
@@ -176,6 +182,7 @@ func Test_componentRepository_ComponentsWithScope(t *testing.T) {
 		{"scope1", args{coms, scope1}, []int{4, 16}},
 		{"scope2", args{coms, scope2}, []int{10}},
 		{"scope3", args{coms, scope3}, []int{8, 9}},
+		{"scope4", args{coms, scope4}, []int{}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -197,6 +204,7 @@ func Test_componentRepository_ComponentsMatchDependency(t *testing.T) {
 	scope2 := NewScope("scope2", scope1)
 	scope3 := NewScope("scope3")
 
+	//lint:ignore U1000 we need the field name to locate the field
 	type testStruct struct {
 		a int
 		b string
@@ -217,6 +225,11 @@ func Test_componentRepository_ComponentsMatchDependency(t *testing.T) {
 		Value("def", Name("name8")),
 	)
 	rep := NewRepository(m.AllComponents())
+
+	t.Run("dep is nil", func(t *testing.T) {
+		coms := rep.ComponentsMatchDependency(nil).ToArray()
+		assert.Equal(t, 0, len(coms))
+	})
 
 	t.Run("scope", func(t *testing.T) {
 		com := m.AllComponents().Filter(func(com Component) bool {
@@ -413,4 +426,16 @@ func Test_componentMatch(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNewRepository(t *testing.T) {
+	com1 := valueProviderOf(1).com
+	com2 := valueProviderOf(1).com
+	com3 := valueProviderOf(1).com
+
+	it := ComponentSlice{com1, com2, com3, com1}
+
+	rep := NewRepository(it)
+	assert.Equal(t, 3, len(rep.AllComponents().ToArray()))
+	assert.Equal(t, it.ToSet(), rep.AllComponents().ToSet())
 }

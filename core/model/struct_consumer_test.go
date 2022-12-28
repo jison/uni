@@ -18,8 +18,107 @@ func (s *errorTypeForStructConsumerTest) Error() string {
 	return s.err
 }
 
+func Test_structField_Format(t *testing.T) {
+	//lint:ignore U1000 we need the field name to locate the field
+	type testStruct struct {
+		a int
+	}
+
+	sc := structConsumerOf(TypeOf(testStruct{}))
+	sf := sc.fields["a"]
+
+	t.Run("no verbose", func(t *testing.T) {
+		expected := fmt.Sprintf("%v at field `a` of %+v", sf.dependency, sf.dependency.Consumer())
+		assert.Equal(t, expected, fmt.Sprintf("%+v", sf))
+	})
+
+	t.Run("verbose", func(t *testing.T) {
+		expected := fmt.Sprintf("%v at field `a`", sf.dependency)
+		assert.Equal(t, expected, fmt.Sprintf("%v", sf))
+	})
+}
+
+func Test_structField_clone(t *testing.T) {
+	//lint:ignore U1000 we need the field name to locate the field
+	type testStruct struct {
+		a int
+	}
+
+	sc := structConsumerOf(TypeOf(testStruct{}))
+	sf := sc.fields["a"]
+
+	t.Run("equality", func(t *testing.T) {
+		sf2 := sf.clone()
+		assert.True(t, sf2.Equal(sf))
+	})
+
+	t.Run("update isolation", func(t *testing.T) {
+		sf2 := sf.clone()
+		sf2.field.Name = "aaa"
+		sf2.ignored = true
+		sf2.dependency.optional = true
+
+		assert.Equal(t, "a", sf.field.Name)
+		assert.Equal(t, false, sf.ignored)
+		assert.Equal(t, false, sf.optional)
+	})
+
+	t.Run("nil", func(t *testing.T) {
+		var sf2 *structField
+		assert.Nil(t, sf2.clone())
+	})
+}
+
+func Test_structField_Equal(t *testing.T) {
+	//lint:ignore U1000 we need the field name to locate the field
+	type testStruct struct {
+		a int
+	}
+
+	sc := structConsumerOf(TypeOf(testStruct{}))
+	sf := sc.fields["a"]
+
+	t.Run("equal", func(t *testing.T) {
+		sf2 := sf.clone()
+		assert.True(t, sf2.Equal(sf))
+	})
+
+	t.Run("not equal to non structField", func(t *testing.T) {
+		assert.False(t, sf.Equal(123))
+	})
+
+	t.Run("nil equal nil", func(t *testing.T) {
+		var sf1 *structField
+		var sf2 *structField
+		assert.True(t, sf1.Equal(sf2))
+	})
+
+	t.Run("ignored", func(t *testing.T) {
+		sf2 := sf.clone()
+		sf2.ignored = true
+		assert.False(t, sf2.Equal(sf))
+	})
+
+	t.Run("field", func(t *testing.T) {
+		sf2 := sf.clone()
+		sf2.field.Name = "b"
+		assert.False(t, sf2.Equal(sf))
+	})
+
+	t.Run("dependency", func(t *testing.T) {
+		sf2 := sf.clone()
+		sf2.dependency.optional = true
+		assert.False(t, sf2.Equal(sf))
+
+		sf3 := sf.clone()
+		sf3.dependency = nil
+		assert.False(t, sf3.Equal(sf))
+	})
+}
+
 func TestStructConsumer(t *testing.T) {
 	t.Run("normal type", func(t *testing.T) {
+		//lint:ignore U1000 we need the field name to locate the field
 		type testStruct struct {
 			a int
 			B string
@@ -64,12 +163,6 @@ func TestStructConsumer(t *testing.T) {
 	})
 
 	t.Run("nil type", func(t *testing.T) {
-		type testStruct struct {
-			a int
-			B string
-			c []int
-		}
-
 		tag1 := NewSymbol("tag1")
 		sc := StructConsumer(TypeOf(nil),
 			Field("a", ByName("abc"), ByTags(tag1), Optional(true)),
@@ -86,6 +179,7 @@ func TestStructConsumer(t *testing.T) {
 }
 
 func Test_structConsumer_Consumer(t *testing.T) {
+	//lint:ignore U1000 we need the field name to locate the field
 	type testStruct struct {
 		a int
 		B string
@@ -148,6 +242,17 @@ func Test_structConsumer_Consumer(t *testing.T) {
 	t.Run("Location", func(t *testing.T) {
 		con := sc.Consumer()
 		assert.Equal(t, loc1, con.Location())
+	})
+
+	t.Run("UpdateCallLocation", func(t *testing.T) {
+		baseLoc := location.GetCallLocation(0)
+		var sc2 *structConsumer
+		func() {
+			sc2 = structConsumerOf(TypeOf(testStruct{}), UpdateCallLocation())
+		}()
+		c := sc2.Consumer()
+		assert.Equal(t, baseLoc.FileName(), c.Location().FileName())
+		assert.Equal(t, baseLoc.FileLine()+4, c.Location().FileLine())
 	})
 
 	t.Run("Validate", func(t *testing.T) {
@@ -228,6 +333,7 @@ func Test_structConsumer_Consumer(t *testing.T) {
 }
 
 func Test_structConsumer_StructConsumerBuilder(t *testing.T) {
+	//lint:ignore U1000 we need the field name to locate the field
 	type testStruct struct {
 		a int
 		B string
@@ -309,16 +415,24 @@ func Test_structConsumer_StructConsumerBuilder(t *testing.T) {
 	})
 
 	t.Run("IgnoreFields", func(t *testing.T) {
-		sc := sc0.clone()
-		sc.IgnoreFields(func(field reflect.StructField) bool {
-			return field.Name == "B"
+		t.Run("ignore fields", func(t *testing.T) {
+			sc := sc0.clone()
+			sc.IgnoreFields(func(field reflect.StructField) bool {
+				return field.Name == "B"
+			})
+			con := sc.Consumer()
+			con.Dependencies().Iterate(func(dep Dependency) bool {
+				if dep.Type() == TypeOf("") {
+					assert.Fail(t, "should not reach here")
+				}
+				return true
+			})
 		})
-		con := sc.Consumer()
-		con.Dependencies().Iterate(func(dep Dependency) bool {
-			if dep.Type() == TypeOf("") {
-				assert.Fail(t, "should not reach here")
-			}
-			return true
+
+		t.Run("predicate is nil", func(t *testing.T) {
+			sc := sc0.clone()
+			sc.IgnoreFields(nil)
+			assert.True(t, sc.Equal(sc0))
 		})
 	})
 
@@ -410,6 +524,7 @@ func Test_structConsumer_StructConsumerBuilder(t *testing.T) {
 }
 
 func Test_structConsumer_clone(t *testing.T) {
+	//lint:ignore U1000 we need the field name to locate the field
 	type testStruct struct {
 		a int
 		B string
@@ -501,9 +616,15 @@ func Test_structConsumer_clone(t *testing.T) {
 
 		verifyConsumer(t, sc3.Consumer())
 	})
+
+	t.Run("nil", func(t *testing.T) {
+		var sc2 *structConsumer
+		assert.Nil(t, sc2.clone())
+	})
 }
 
 func Test_structConsumer_Equal(t *testing.T) {
+	//lint:ignore U1000 we need the field name to locate the field
 	type testStruct struct {
 		a int
 		B string
@@ -526,27 +647,86 @@ func Test_structConsumer_Equal(t *testing.T) {
 		assert.True(t, sc.Equal(sc2))
 	})
 
+	t.Run("nil equal nil", func(t *testing.T) {
+		var sc1 *structConsumer
+		var sc2 *structConsumer
+		assert.True(t, sc1.Equal(sc2))
+	})
+
+	t.Run("not equal to non structConsumer", func(t *testing.T) {
+		assert.False(t, sc.Equal(123))
+	})
+
 	t.Run("type", func(t *testing.T) {
 		sc2 := sc.clone()
 		sc2.sType = TypeOf(0)
 		assert.False(t, sc.Equal(sc2))
 	})
 
-	t.Run("field", func(t *testing.T) {
-		sc2 := sc.clone()
-		sc2.Field("a", ByName("def"))
-		assert.False(t, sc.Equal(sc2))
+	t.Run("fields", func(t *testing.T) {
+		t.Run("len of fields", func(t *testing.T) {
+			sc2 := sc.clone()
+			sc2.fields["d"] = &structField{}
+			assert.False(t, sc.Equal(sc2))
+		})
+
+		t.Run("field with same name", func(t *testing.T) {
+			sc2 := sc.clone()
+			sc2.Field("a", ByName("def"))
+			assert.False(t, sc.Equal(sc2))
+		})
+
+		t.Run("field name not equal", func(t *testing.T) {
+			sc2 := sc.clone()
+			sc2.fields["d"] = &structField{}
+			sc3 := sc.clone()
+			sc3.fields["e"] = &structField{}
+			assert.False(t, sc3.Equal(sc2))
+		})
+
 	})
 
-	t.Run("fakeField", func(t *testing.T) {
-		sc2 := sc.clone()
-		sc2.Field("d", ByName("def"))
-		assert.False(t, sc.Equal(sc2))
+	t.Run("fakeFields", func(t *testing.T) {
+		t.Run("len of fakeFields", func(t *testing.T) {
+			sc2 := sc.clone()
+			sc2.Field("d", ByName("def"))
+			assert.False(t, sc.Equal(sc2))
+		})
+
+		t.Run("fakeFields with same name", func(t *testing.T) {
+			sc2 := sc.clone()
+			sc2.Field("d", ByName("abc"))
+			sc3 := sc.clone()
+			sc3.Field("d", ByName("def"))
+			assert.False(t, sc3.Equal(sc2))
+		})
+
+		t.Run("field name not equal", func(t *testing.T) {
+			sc2 := sc.clone()
+			sc2.Field("d", ByName("abc"))
+			sc3 := sc.clone()
+			sc3.Field("e", ByName("abc"))
+			assert.False(t, sc3.Equal(sc2))
+		})
 	})
 
 	t.Run("baseConsumer", func(t *testing.T) {
-		sc2 := sc.clone()
-		sc2.SetLocation(location.GetCallLocation(0))
-		assert.False(t, sc.Equal(sc2))
+		t.Run("not nil", func(t *testing.T) {
+			sc2 := sc.clone()
+			sc2.SetLocation(location.GetCallLocation(0))
+			assert.False(t, sc.Equal(sc2))
+		})
+
+		t.Run("nil", func(t *testing.T) {
+			sc2 := sc.clone()
+			sc2.baseConsumer = nil
+			assert.False(t, sc2.Equal(sc))
+			assert.False(t, sc.Equal(sc2))
+
+			sc3 := sc.clone()
+			sc3.baseConsumer = nil
+			assert.True(t, sc3.Equal(sc2))
+		})
+
 	})
 }

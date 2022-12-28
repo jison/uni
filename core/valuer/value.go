@@ -14,6 +14,8 @@ type Value interface {
 	AsArray() ([]reflect.Value, bool)
 	AsError() (error, bool)
 
+	Interface() (interface{}, error)
+
 	Initialized() bool
 }
 
@@ -54,6 +56,18 @@ func (s *singleValue) AsSingle() (reflect.Value, bool) {
 	return s.val, true
 }
 
+func (s *singleValue) Interface() (interface{}, error) {
+	if !s.val.IsValid() {
+		return nil, errors.Newf("%v is invalid", s.val)
+	}
+
+	if !s.val.CanInterface() {
+		return nil, errors.Newf("%v can not Interface()", s.val)
+	}
+
+	return s.val.Interface(), nil
+}
+
 func ErrorValue(err error) Value {
 	if err == nil {
 		return SingleValue(reflect.ValueOf(nil))
@@ -72,6 +86,10 @@ func (e *errorValue) AsError() (error, bool) {
 	return e.err, true
 }
 
+func (e *errorValue) Interface() (interface{}, error) {
+	return nil, e.err
+}
+
 func ArrayValue(arr []reflect.Value) Value {
 	return &arrayValue{arr: arr}
 }
@@ -85,6 +103,10 @@ var _ Value = &arrayValue{}
 
 func (a *arrayValue) AsArray() ([]reflect.Value, bool) {
 	return a.arr, true
+}
+
+func (a *arrayValue) Interface() (interface{}, error) {
+	return reflecting.ArrayOfReflectValues(a.arr)
 }
 
 func LazyValue(f func() Value) Value {
@@ -119,6 +141,10 @@ func (l *lazyValue) AsArray() ([]reflect.Value, bool) {
 
 func (l *lazyValue) AsError() (error, bool) {
 	return l.getValue().AsError()
+}
+
+func (l *lazyValue) Interface() (interface{}, error) {
+	return l.getValue().Interface()
 }
 
 func (l *lazyValue) Initialized() bool {

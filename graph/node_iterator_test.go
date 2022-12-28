@@ -79,10 +79,7 @@ func TestNodeAndAttrs_InterruptDuringIterate(t *testing.T) {
 		na := NodesWithAttrs{1: Attrs{1: 2}, "a": Attrs{3: 4}, 2: Attrs{5: 6}, "b": Attrs{7: 8}}
 		didNotInterrupted := na.Iterate(func(node Node, attrs AttrsView) bool {
 			res[node] = AttrsFrom(attrs)
-			if len(res) >= 2 {
-				return false
-			}
-			return true
+			return len(res) < 2
 		})
 
 		assert.Equal(t, 2, len(res))
@@ -155,16 +152,16 @@ func Test_graphNodes_Iterate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var nodesIter nodeIterateFunc
+			var nodesIter NodeIterator
 			if tt.fields.nodes != nil {
-				nodesIter = func(f func(node Node) bool) bool {
+				nodesIter = nodeIterateFunc(func(f func(node Node) bool) bool {
 					for _, n := range tt.fields.nodes {
 						if !f(n) {
 							return false
 						}
 					}
 					return true
-				}
+				})
 			}
 
 			g := NewDirectedGraph()
@@ -202,7 +199,7 @@ func Test_graphNodes_Iterate(t *testing.T) {
 
 func TestNodesWithAttrsFrom(t *testing.T) {
 	type args struct {
-		na NodesWithAttrs
+		na NodeAndAttrsIterator
 	}
 	tests := []struct {
 		name string
@@ -242,42 +239,60 @@ func TestNodeEntry_Iterate(t *testing.T) {
 
 func Test_combinedNodeIterator_Iterate(t *testing.T) {
 	type args struct {
-		left  NodeAndAttrsIterator
-		right NodeAndAttrsIterator
+		//left  NodeAndAttrsIterator
+		//right NodeAndAttrsIterator
+
+		it *combinedNodeIterator
 	}
 	tests := []struct {
 		name string
 		args args
 		want NodesWithAttrs
 	}{
-		{"both args are nil", args{nil, nil}, NodesWithAttrs{}},
-		{"left is nil", args{nil, NodesWithAttrs{1: Attrs{"a": "b"}}},
-			NodesWithAttrs{1: Attrs{"a": "b"}}},
-		{"right is nil", args{NodesWithAttrs{2: Attrs{"a": "b"}}, nil},
-			NodesWithAttrs{2: Attrs{"a": "b"}}},
+		{"it is nil",
+			args{nil},
+			NodesWithAttrs{},
+		},
+		{"both args are nil",
+			args{
+				&combinedNodeIterator{nil, nil},
+			},
+			NodesWithAttrs{},
+		},
+		{"left is nil",
+			args{
+				&combinedNodeIterator{nil, NodesWithAttrs{1: Attrs{"a": "b"}}},
+			},
+			NodesWithAttrs{1: Attrs{"a": "b"}},
+		},
+		{"right is nil",
+			args{
+				&combinedNodeIterator{NodesWithAttrs{2: Attrs{"a": "b"}}, nil},
+			},
+			NodesWithAttrs{2: Attrs{"a": "b"}},
+		},
 		{"both args are not nil",
 			args{
-				NodesWithAttrs{2: Attrs{"a": "b"}},
-				NodesWithAttrs{1: Attrs{"a": "b"}},
+				&combinedNodeIterator{
+					NodesWithAttrs{2: Attrs{"a": "b"}},
+					NodesWithAttrs{1: Attrs{"a": "b"}},
+				},
 			},
 			NodesWithAttrs{1: Attrs{"a": "b"}, 2: Attrs{"a": "b"}},
 		},
 		{"left and right are same",
 			args{
-				NodesWithAttrs{2: Attrs{"a": "b"}},
-				NodesWithAttrs{2: Attrs{"a": "b"}},
+				&combinedNodeIterator{
+					NodesWithAttrs{2: Attrs{"a": "b"}},
+					NodesWithAttrs{2: Attrs{"a": "b"}},
+				},
 			},
 			NodesWithAttrs{2: Attrs{"a": "b"}},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			it := &combinedNodeIterator{
-				left:  tt.args.left,
-				right: tt.args.right,
-			}
-
-			assert.Equal(t, tt.want, NodesWithAttrsFrom(it))
+			assert.Equal(t, tt.want, NodesWithAttrsFrom(tt.args.it))
 		})
 	}
 
@@ -378,6 +393,7 @@ func Test_combineNodeIterators(t *testing.T) {
 			args{[]NodeAndAttrsIterator{
 				NodesWithAttrs{1: Attrs{"a": "b"}}, NodesWithAttrs{2: Attrs{"a": "b"}}, NodesWithAttrs{3: Attrs{}},
 				NodesWithAttrs{3: Attrs{}}, NodesWithAttrs{2: Attrs{"a": "b"}}, NodesWithAttrs{1: Attrs{"a": "b"}},
+				nil,
 			}},
 			NodesWithAttrs{1: Attrs{"a": "b"}, 2: Attrs{"a": "b"}, 3: Attrs{}},
 		},

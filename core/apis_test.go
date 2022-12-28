@@ -80,6 +80,14 @@ func TestFuncOf(t *testing.T) {
 		assert.Equal(t, 123, ret.([]interface{})[0])
 		assert.Nil(t, err)
 	})
+
+	t.Run("container is nil", func(t *testing.T) {
+		var c Container
+		_, err := FuncOf(c, func(a testStruct3, b *testStruct3) (int, error) {
+			return a.a, nil
+		})
+		assert.NotNil(t, err)
+	})
 }
 
 func TestStructOf(t *testing.T) {
@@ -95,6 +103,12 @@ func TestStructOf(t *testing.T) {
 			a: 123,
 			b: "abc",
 		}, ret)
+	})
+
+	t.Run("container is nil", func(t *testing.T) {
+		var c Container
+		_, err := StructOf(c, testStruct{})
+		assert.NotNil(t, err)
 	})
 }
 
@@ -112,6 +126,12 @@ func TestValueOf(t *testing.T) {
 		assert.Equal(t, 123, ts3.a)
 		assert.Equal(t, "abc", ts3.b)
 	})
+
+	t.Run("container is nil", func(t *testing.T) {
+		var c Container
+		_, err := ValueOf(c, 0)
+		assert.NotNil(t, err)
+	})
 }
 
 func TestEnterScope(t *testing.T) {
@@ -125,6 +145,13 @@ func TestEnterScope(t *testing.T) {
 		c2, err2 := EnterScope(c1, scope2)
 		assert.Nil(t, err2)
 		assert.Equal(t, scope2, c2.Scope())
+	})
+
+	t.Run("container is nil", func(t *testing.T) {
+		scope1 := model.NewScope("scope1")
+		var c Container
+		_, err := EnterScope(c, scope1)
+		assert.NotNil(t, err)
 	})
 }
 
@@ -142,11 +169,20 @@ func TestLeaveScope(t *testing.T) {
 		c5 := LeaveScope(c4)
 		assert.Equal(t, model.GlobalScope, c5.Scope())
 	})
+
+	t.Run("container is nil", func(t *testing.T) {
+		var c Container
+		c2 := LeaveScope(c)
+		assert.Nil(t, c2)
+	})
 }
 
 func TestWithContainer(t *testing.T) {
 	m, _, _ := buildModuleForContainerTest()
 	c, _ := NewContainer(m)
+
+	c1 := ContainerOfCtx(context.TODO())
+	assert.Nil(t, c1)
 
 	ctx := WithContainerCtx(context.TODO(), c)
 	c2 := ContainerOfCtx(ctx)
@@ -231,6 +267,12 @@ func TestEnterScopeCtx(t *testing.T) {
 		c2 := ContainerOfCtx(ctx2)
 		assert.Equal(t, scope2, c2.Scope())
 	})
+
+	t.Run("container is nil", func(t *testing.T) {
+		scope1 := model.NewScope("scope1")
+		_, err1 := EnterScopeCtx(context.TODO(), scope1)
+		assert.NotNil(t, err1)
+	})
 }
 
 func TestLeaveScopeCtx(t *testing.T) {
@@ -250,5 +292,11 @@ func TestLeaveScopeCtx(t *testing.T) {
 		ctx5 := LeaveScopeCtx(ctx4)
 		c5 := ContainerOfCtx(ctx5)
 		assert.Equal(t, model.GlobalScope, c5.Scope())
+	})
+
+	t.Run("container is nil", func(t *testing.T) {
+		ctx := context.TODO()
+		ctx2 := LeaveScopeCtx(ctx)
+		assert.Same(t, ctx, ctx2)
 	})
 }

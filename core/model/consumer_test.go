@@ -57,7 +57,9 @@ func Test_baseConsumer(t *testing.T) {
 		assert.Equal(t, valuer.Const(reflect.ValueOf(123)), bc.Valuer())
 		assert.True(t, bc.Valuer() == bc.Valuer())
 	})
+}
 
+func Test_baseConsumer_clone(t *testing.T) {
 	t.Run("clone", func(t *testing.T) {
 		scope1 := NewScope("scope1")
 		loc1 := location.GetCallLocation(0)
@@ -91,43 +93,65 @@ func Test_baseConsumer(t *testing.T) {
 			bc2.val = val2
 			verifyConsumer(t, bc)
 		})
+
+		t.Run("nil", func(t *testing.T) {
+			var bc2 *baseConsumer
+			assert.Nil(t, bc2.clone())
+		})
 	})
+}
+
+func Test_baseConsumer_Equal(t *testing.T) {
+	scope1 := NewScope("scope1")
+	loc1 := location.GetCallLocation(0)
+	val1 := valuer.Const(reflect.ValueOf(123))
+	c := &baseConsumer{
+		scope: scope1,
+		loc:   loc1,
+		val:   val1,
+	}
 
 	t.Run("equal", func(t *testing.T) {
-		scope1 := NewScope("scope1")
-		loc1 := location.GetCallLocation(0)
-		val1 := valuer.Const(reflect.ValueOf(123))
-		c := &baseConsumer{
-			scope: scope1,
-			loc:   loc1,
-			val:   val1,
-		}
+		c2 := c.clone()
+		assert.True(t, c.Equal(c2))
+	})
 
-		t.Run("equal", func(t *testing.T) {
+	t.Run("not equal to non baseConsumer", func(t *testing.T) {
+		assert.False(t, c.Equal(123))
+	})
+
+	t.Run("scope", func(t *testing.T) {
+		scope2 := NewScope("scope2")
+
+		c2 := c.clone()
+		c2.SetScope(scope2)
+		assert.False(t, c.Equal(c2))
+	})
+
+	t.Run("location", func(t *testing.T) {
+		loc2 := location.GetCallLocation(0)
+
+		c2 := c.clone()
+		c2.SetLocation(loc2)
+		assert.False(t, c.Equal(c2))
+	})
+
+	t.Run("valuer", func(t *testing.T) {
+		t.Run("not nil", func(t *testing.T) {
 			c2 := c.clone()
-			assert.True(t, c.Equal(c2))
+			c2.val = valuer.OneOf()
+			assert.False(t, c2.Equal(c))
 		})
 
-		t.Run("scope", func(t *testing.T) {
-			scope2 := NewScope("scope2")
-
-			c2 := c.clone()
-			c2.SetScope(scope2)
-			assert.False(t, c.Equal(c2))
-		})
-
-		t.Run("location", func(t *testing.T) {
-			loc2 := location.GetCallLocation(0)
-
-			c2 := c.clone()
-			c2.SetLocation(loc2)
-			assert.False(t, c.Equal(c2))
-		})
-
-		t.Run("valuer", func(t *testing.T) {
+		t.Run("not nil", func(t *testing.T) {
 			c2 := c.clone()
 			c2.val = nil
 			assert.False(t, c2.Equal(c))
+			assert.False(t, c.Equal(c2))
+
+			c3 := c.clone()
+			c3.val = nil
+			assert.True(t, c3.Equal(c2))
 		})
 	})
 }

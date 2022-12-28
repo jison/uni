@@ -26,7 +26,7 @@ func InitStructWithReflectValues(structOrPtrOfStructType reflect.Type, values ma
 	}
 
 	structPtrVal := reflect.New(structType)
-	err := UpdateReflectStructFields(structPtrVal, values)
+	err := updateReflectStructFields(structPtrVal, values)
 	if err != nil {
 		return reflect.Value{}, err
 	}
@@ -40,29 +40,19 @@ func InitStructWithReflectValues(structOrPtrOfStructType reflect.Type, values ma
 
 func UpdateStructFields(structPtr interface{}, values map[string]interface{}) error {
 	val := reflect.ValueOf(structPtr)
-	if val.Kind() != reflect.Ptr || val.Elem().Kind() != reflect.Struct {
-		// only pointer of struct can do this
-		return errors.Newf("param should be a pointer of struct")
-	}
-
 	reflectValues := make(map[string]reflect.Value)
 	for name, value := range values {
 		reflectValues[name] = reflect.ValueOf(value)
 	}
-	return UpdateReflectStructFields(val, reflectValues)
+	return updateReflectStructFields(val, reflectValues)
 }
 
-func UpdateReflectStructFields(structOrPtrOfStruct reflect.Value, values map[string]reflect.Value) error {
-	var structVal reflect.Value
-	if structOrPtrOfStruct.Kind() == reflect.Ptr {
-		structVal = structOrPtrOfStruct.Elem()
-	} else {
-		structVal = structOrPtrOfStruct
+func updateReflectStructFields(structPtr reflect.Value, values map[string]reflect.Value) error {
+	if structPtr.Kind() != reflect.Ptr || structPtr.Elem().Kind() != reflect.Struct {
+		// only pointer of struct can do this
+		return errors.Newf("param should be a pointer of struct")
 	}
-
-	if structVal.Kind() != reflect.Struct {
-		return errors.Newf("param should be a value of struct or a pointer of struct")
-	}
+	structVal := structPtr.Elem()
 
 	for name, value := range values {
 		fieldVal := structVal.FieldByName(name)
@@ -72,6 +62,9 @@ func UpdateReflectStructFields(structOrPtrOfStruct reflect.Value, values map[str
 		if !value.Type().AssignableTo(fieldVal.Type()) {
 			return errors.Newf("%v (%v) can not assignable to type %v of field `%v`",
 				value, value.Type(), fieldVal.Type(), name)
+		}
+		if !value.CanInterface() {
+			return errors.Newf("%v CanInterface() is false", value)
 		}
 	}
 

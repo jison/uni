@@ -12,6 +12,7 @@ import (
 
 func TestStruct(t *testing.T) {
 	t.Run("normal", func(t *testing.T) {
+		//lint:ignore U1000 we need the field name to locate the field
 		type testStruct struct {
 			a int
 			B string
@@ -85,13 +86,6 @@ func TestStruct(t *testing.T) {
 	})
 
 	t.Run("nil type", func(t *testing.T) {
-		type testStruct struct {
-			a int
-			B string
-			c []int
-			D rune
-		}
-
 		type testInterface interface{}
 
 		tag1 := NewSymbol("tag1")
@@ -119,6 +113,7 @@ func TestStruct(t *testing.T) {
 }
 
 func Test_structProvider_Provider(t *testing.T) {
+	//lint:ignore U1000 we need the field name to locate the field
 	type testStruct struct {
 		a int
 		B string
@@ -186,6 +181,18 @@ func Test_structProvider_Provider(t *testing.T) {
 		sp := sp0.clone()
 		pro := sp.Provider()
 		assert.Equal(t, loc1, pro.Location())
+	})
+
+	t.Run("UpdateCallLocation", func(t *testing.T) {
+		baseLoc := location.GetCallLocation(0)
+		var sp StructProviderBuilder
+		func() {
+			sp = structProviderOf(TypeOf(&testStruct{}), UpdateCallLocation())
+		}()
+		p := sp.Provider()
+
+		assert.Equal(t, baseLoc.FileName(), p.Location().FileName())
+		assert.Equal(t, baseLoc.FileLine()+4, p.Location().FileLine())
 	})
 
 	t.Run("Components", func(t *testing.T) {
@@ -282,6 +289,10 @@ func Test_structProvider_Provider(t *testing.T) {
 			assert.NotNil(t, err)
 		})
 
+		t.Run("error from structConsumer", func(t *testing.T) {
+
+		})
+
 		t.Run("component with error", func(t *testing.T) {
 			sp := sp0.clone()
 			sp.AddAs(TypeOf(1))
@@ -308,6 +319,7 @@ func Test_structProvider_Provider(t *testing.T) {
 }
 
 func Test_structProvider_StructProviderBuilder(t *testing.T) {
+	//lint:ignore U1000 we need the field name to locate the field
 	type testStruct struct {
 		a int
 		B string
@@ -521,12 +533,12 @@ func Test_structProvider_StructProviderBuilder(t *testing.T) {
 	})
 
 	t.Run("SetLocation", func(t *testing.T) {
-		loc1 := location.GetCallLocation(0)
+		loc2 := location.GetCallLocation(0)
 
 		sp1 := sp.clone()
-		sp1.SetLocation(loc1)
+		sp1.SetLocation(loc2)
 		pro := sp1.Provider()
-		assert.Equal(t, loc1, pro.Location())
+		assert.Equal(t, loc2, pro.Location())
 	})
 
 	t.Run("UpdateCallLocation", func(t *testing.T) {
@@ -556,6 +568,7 @@ func Test_structProvider_StructProviderBuilder(t *testing.T) {
 }
 
 func Test_structProvider_clone(t *testing.T) {
+	//lint:ignore U1000 we need the field name to locate the field
 	type testStruct struct {
 		a int
 		B string
@@ -672,9 +685,15 @@ func Test_structProvider_clone(t *testing.T) {
 
 		verifyProvider(t, sp3.Provider())
 	})
+
+	t.Run("nil", func(t *testing.T) {
+		var sp *structProvider
+		assert.Nil(t, sp.clone())
+	})
 }
 
 func Test_structProvider_Equal(t *testing.T) {
+	//lint:ignore U1000 we need the field name to locate the field
 	type testStruct struct {
 		a int
 		B string
@@ -707,16 +726,56 @@ func Test_structProvider_Equal(t *testing.T) {
 		assert.True(t, sp2.Equal(sp))
 	})
 
-	t.Run("structConsumer", func(t *testing.T) {
+	t.Run("not equal with other kind of provider", func(t *testing.T) {
 		sp2 := sp.clone()
-		sp2.Field("a", ByName("a2"))
-		assert.False(t, sp2.Equal(sp))
+		vp := valueProviderOf(123)
+		assert.False(t, sp2.Equal(vp))
+	})
+
+	t.Run("nil equal nil", func(t *testing.T) {
+		var sp2 *structProvider
+		var sp3 *structProvider
+		assert.True(t, sp2.Equal(sp3))
+	})
+
+	t.Run("structConsumer", func(t *testing.T) {
+		t.Run("not nil", func(t *testing.T) {
+			sp2 := sp.clone()
+			sp2.Field("a", ByName("a2"))
+			assert.False(t, sp2.Equal(sp))
+		})
+
+		t.Run("nil", func(t *testing.T) {
+			sp2 := sp.clone()
+			sp2.structConsumer = nil
+			assert.False(t, sp2.Equal(sp))
+			assert.False(t, sp.Equal(sp2))
+
+			sp3 := sp.clone()
+			sp3.structConsumer = nil
+			assert.True(t, sp3.Equal(sp2))
+		})
+
 	})
 
 	t.Run("component", func(t *testing.T) {
-		sp2 := sp.clone()
-		sp2.SetName("s2")
-		assert.False(t, sp2.Equal(sp))
+		t.Run("not nil", func(t *testing.T) {
+			sp2 := sp.clone()
+			sp2.SetName("s2")
+			assert.False(t, sp2.Equal(sp))
+		})
+
+		t.Run("nil", func(t *testing.T) {
+			sp2 := sp.clone()
+			sp2.com = nil
+			assert.False(t, sp2.Equal(sp))
+			assert.False(t, sp.Equal(sp2))
+
+			sp3 := sp.clone()
+			sp3.com = nil
+
+			assert.True(t, sp3.Equal(sp2))
+		})
 	})
 
 }

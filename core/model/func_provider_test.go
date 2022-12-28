@@ -21,6 +21,30 @@ func funcForFuncProviderTest(a int, b string, c []int, d rune) (*testStructForFu
 	return &testStructForFuncProviderTest{a, b, c, d}, 0, nil
 }
 
+func Test_componentByIndex(t *testing.T) {
+	com1 := &component{rType: TypeOf(0)}
+	com2 := &component{rType: TypeOf(0)}
+	com3 := &component{rType: TypeOf(0)}
+
+	tests := []struct {
+		name string
+		it   componentByIndex
+		want []Component
+	}{
+		{"nil", nil, []Component{}},
+		{"0", componentByIndex{}, []Component{}},
+		{"1", componentByIndex{0: com1}, []Component{com1}},
+		{"2", componentByIndex{0: com1, 1: com2}, []Component{com1, com2}},
+		{"n", componentByIndex{0: com1, 1: com2, 2: com3}, []Component{com1, com2, com3}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testComponentIterator(t, tt.it, tt.want)
+		})
+	}
+}
+
 func TestFunc(t *testing.T) {
 	t.Run("normal value", func(t *testing.T) {
 		type testInterface interface{}
@@ -201,10 +225,20 @@ func Test_funcProvider_Provider(t *testing.T) {
 	})
 
 	t.Run("Location", func(t *testing.T) {
-		fp := fp0.clone()
 		loc1 := location.GetCallLocation(0)
-		fp.SetLocation(loc1)
-		assert.Equal(t, loc1, fp.Provider().Location())
+		fp1 := funcProviderOf(funcForFuncProviderTest, Location(loc1))
+		assert.Equal(t, loc1, fp1.Provider().Location())
+	})
+
+	t.Run("UpdateCallLocation", func(t *testing.T) {
+		baseLoc := location.GetCallLocation(0)
+		var fp1 *funcProvider
+		func() {
+			fp1 = funcProviderOf(funcForFuncProviderTest, UpdateCallLocation())
+		}()
+
+		assert.Equal(t, baseLoc.FileName(), fp1.Location().FileName())
+		assert.Equal(t, baseLoc.FileLine()+4, fp1.Location().FileLine())
 	})
 
 	t.Run("Components", func(t *testing.T) {
@@ -825,6 +859,11 @@ func Test_funcProvider_clone(t *testing.T) {
 
 		verifyProvider(t, fp3.Provider())
 	})
+
+	t.Run("nil", func(t *testing.T) {
+		var fp2 *funcProvider
+		assert.Nil(t, fp2.clone())
+	})
 }
 
 func Test_funcProvider_Equal(t *testing.T) {
@@ -852,25 +891,82 @@ func Test_funcProvider_Equal(t *testing.T) {
 		assert.True(t, fp.Equal(fp2))
 	})
 
+	t.Run("not equal to non funcProvider", func(t *testing.T) {
+		assert.False(t, fp.Equal(123))
+	})
+
+	t.Run("nil equal nil", func(t *testing.T) {
+		var fp2 *funcProvider
+		var fp3 *funcProvider
+		assert.True(t, fp2.Equal(fp3))
+	})
+
 	t.Run("funcConsumer", func(t *testing.T) {
-		fp2 := fp.clone()
-		fp2.Param(0, ByName("a2"))
-		assert.False(t, fp2.Equal(fp))
-		assert.False(t, fp.Equal(fp2))
+		t.Run("nil", func(t *testing.T) {
+			fp2 := fp.clone()
+			fp2.funcConsumer = nil
+			assert.False(t, fp2.Equal(fp))
+			assert.False(t, fp.Equal(fp2))
+
+			fp3 := fp.clone()
+			fp3.funcConsumer = nil
+			assert.True(t, fp3.Equal(fp2))
+		})
+
+		t.Run("not nil", func(t *testing.T) {
+			fp2 := fp.clone()
+			fp2.Param(0, ByName("a2"))
+			assert.False(t, fp2.Equal(fp))
+			assert.False(t, fp.Equal(fp2))
+		})
 	})
 
-	t.Run("component", func(t *testing.T) {
-		fp2 := fp.clone()
-		fp2.Return(0, Name("r2"))
-		assert.False(t, fp2.Equal(fp))
-		assert.False(t, fp.Equal(fp2))
+	t.Run("components", func(t *testing.T) {
+		t.Run("len not equal", func(t *testing.T) {
+			fp2 := fp.clone()
+			fp2.components[2] = &component{rType: TypeOf(0)}
+			assert.False(t, fp2.Equal(fp))
+		})
+
+		t.Run("components does not have same index", func(t *testing.T) {
+			fp2 := fp.clone()
+			fp2.components[2] = fp2.components[1]
+			delete(fp2.components, 1)
+			assert.False(t, fp2.Equal(fp))
+		})
+
+		t.Run("component not equal at same index", func(t *testing.T) {
+			fp2 := fp.clone()
+			fp2.Return(0, Name("r2"))
+			assert.False(t, fp2.Equal(fp))
+			assert.False(t, fp.Equal(fp2))
+		})
 	})
 
-	t.Run("fakeComponent", func(t *testing.T) {
-		fp2 := fp.clone()
-		fp2.Param(0, ByName("a2"))
-		fp2.Return(2, Name("r"))
-		assert.False(t, fp2.Equal(fp))
-		assert.False(t, fp.Equal(fp2))
+	t.Run("fakeComponents", func(t *testing.T) {
+
+		t.Run("len not equal", func(t *testing.T) {
+			fp2 := fp.clone()
+			fp2.Return(2, Name("r"))
+			assert.False(t, fp2.Equal(fp))
+		})
+
+		t.Run("components does hot have same index", func(t *testing.T) {
+			fp2 := fp.clone()
+			fp2.Return(2, Name("r"))
+			fp3 := fp.clone()
+			fp3.Return(3, Name("r2"))
+			assert.False(t, fp2.Equal(fp3))
+			assert.False(t, fp3.Equal(fp2))
+		})
+
+		t.Run("component not equal at same index", func(t *testing.T) {
+			fp2 := fp.clone()
+			fp2.Return(2, Name("r"))
+			fp3 := fp.clone()
+			fp3.Return(2, Name("r2"))
+			assert.False(t, fp2.Equal(fp3))
+			assert.False(t, fp3.Equal(fp2))
+		})
 	})
 }

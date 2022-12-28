@@ -187,6 +187,30 @@ func Test_pathNode_Append(t *testing.T) {
 		assert.Equal(t, nodes, nodeIteratorToArray(path.Nodes()))
 		assert.Equal(t, g, path.Graph())
 	})
+
+	t.Run("node is nil", func(t *testing.T) {
+		rep := model.NewRepository(model.EmptyComponents())
+		g := newDependenceGraph(rep)
+
+		n := 10
+		path := NewPath(g)
+		var nodes []Node
+		for i := 0; i < n; i++ {
+			node := valuer.Index(i)
+			nodes = append(nodes, node)
+			path = path.Append(node)
+		}
+		path.Append(nil)
+
+		// reserve nodes
+		for i, j := 0, len(nodes)-1; i < j; i, j = i+1, j-1 {
+			nodes[i], nodes[j] = nodes[j], nodes[i]
+		}
+
+		assert.Equal(t, n, path.Len())
+		assert.Equal(t, nodes, nodeIteratorToArray(path.Nodes()))
+		assert.Equal(t, g, path.Graph())
+	})
 }
 
 func Test_pathNode_Reversed(t *testing.T) {
@@ -323,6 +347,7 @@ func Test_pathNode_Format(t *testing.T) {
 	})
 
 	t.Run("not empty", func(t *testing.T) {
+		//lint:ignore U1000 we need the field name to locate the field
 		type testStruct struct {
 			a int
 		}
@@ -332,13 +357,16 @@ func Test_pathNode_Format(t *testing.T) {
 		)
 		rep := model.NewRepository(m.AllComponents())
 		g := newDependenceGraph(rep)
-		path := NewPath(g)
+
+		consumer := model.ValueConsumer(testStruct{}).Consumer()
+		dg, consumerNode := g.Derive(consumer)
 
 		com := m.AllComponents().ToArray()[0]
-		var node Node = com.Valuer()
+		node := consumerNode
+		path := NewPath(dg)
 		for {
 			path = path.Append(node)
-			r := g.InputNodesTo(node).Iterate(func(n Node) bool {
+			r := dg.InputNodesTo(node).Iterate(func(n Node) bool {
 				node = n
 				return false
 			})
@@ -346,18 +374,26 @@ func Test_pathNode_Format(t *testing.T) {
 				break
 			}
 		}
-		var dep model.Dependency
+		var comDep model.Dependency
 		com.Provider().Dependencies().Iterate(func(d model.Dependency) bool {
-			dep = d
+			comDep = d
+			return false
+		})
+
+		var conDep model.Dependency
+		consumer.Dependencies().Iterate(func(d model.Dependency) bool {
+			conDep = d
 			return false
 		})
 
 		t.Run("not verbose", func(t *testing.T) {
 			expected := strings.Builder{}
-			expected.WriteString("path:\n")
-			expected.WriteString(fmt.Sprintf("\t%v\n", dep))
-			expected.WriteString(fmt.Sprintf("\t%+v\n", com.Provider()))
-			expected.WriteString(fmt.Sprintf("\t%v\n", com))
+			expected.WriteString("path:")
+			expected.WriteString(fmt.Sprintf("\n\t%v", comDep))
+			expected.WriteString(fmt.Sprintf("\n\t%+v", com.Provider()))
+			expected.WriteString(fmt.Sprintf("\n\t%v", com))
+			expected.WriteString(fmt.Sprintf("\n\t%v", conDep))
+			expected.WriteString(fmt.Sprintf("\n\t%+v", consumer))
 
 			str := fmt.Sprintf("%v", path)
 			assert.Equal(t, expected.String(), str)
@@ -365,11 +401,13 @@ func Test_pathNode_Format(t *testing.T) {
 
 		t.Run("verbose", func(t *testing.T) {
 			expected := strings.Builder{}
-			expected.WriteString("path:\n")
-			expected.WriteString(fmt.Sprintf("\t%v\n", valuer.Error(&missingError{dep})))
-			expected.WriteString(fmt.Sprintf("\t%v\n", dep))
-			expected.WriteString(fmt.Sprintf("\t%+v\n", com.Provider()))
-			expected.WriteString(fmt.Sprintf("\t%v\n", com))
+			expected.WriteString("path:")
+			expected.WriteString(fmt.Sprintf("\n\t%v", valuer.Error(&missingError{comDep})))
+			expected.WriteString(fmt.Sprintf("\n\t%v", comDep))
+			expected.WriteString(fmt.Sprintf("\n\t%+v", com.Provider()))
+			expected.WriteString(fmt.Sprintf("\n\t%v", com))
+			expected.WriteString(fmt.Sprintf("\n\t%v", conDep))
+			expected.WriteString(fmt.Sprintf("\n\t%+v", consumer))
 
 			str := fmt.Sprintf("%+v", path)
 			assert.Equal(t, expected.String(), str)

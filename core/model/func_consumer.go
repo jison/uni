@@ -25,6 +25,10 @@ func (p *funcParam) Format(f fmt.State, r rune) {
 }
 
 func (p *funcParam) clone() *funcParam {
+	if p == nil {
+		return nil
+	}
+
 	return &funcParam{
 		dependency: p.dependency.clone(),
 		index:      p.index,
@@ -62,6 +66,10 @@ func (m paramByIndex) Iterate(f func(Dependency) bool) bool {
 		}
 	}
 	return true
+}
+
+func (m paramByIndex) Format(fs fmt.State, r rune) {
+	formatDependencyIterator(m, fs, r)
 }
 
 type funcConsumer struct {
@@ -118,6 +126,10 @@ func (fc *funcConsumer) Format(f fmt.State, r rune) {
 }
 
 func (fc *funcConsumer) clone() *funcConsumer {
+	if fc == nil {
+		return nil
+	}
+
 	cloned := &funcConsumer{
 		baseConsumer: fc.baseConsumer.clone(),
 		funcVal:      fc.funcVal,
@@ -144,6 +156,10 @@ func (fc *funcConsumer) Equal(other interface{}) bool {
 	if !ok {
 		return false
 	}
+	if fc == nil || o == nil {
+		return fc == nil && o == nil
+	}
+
 	if fc.funcVal != o.funcVal {
 		return false
 	}

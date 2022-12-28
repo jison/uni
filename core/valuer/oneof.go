@@ -1,7 +1,6 @@
 package valuer
 
 import (
-	"fmt"
 	"math/rand"
 
 	"github.com/jison/uni/internal/errors"
@@ -38,7 +37,7 @@ func (v *oneOfValuer) Value(inputs []Value) Value {
 }
 
 func (v *oneOfValuer) String() string {
-	return fmt.Sprintf("OneOf")
+	return "OneOf"
 }
 
 func (v *oneOfValuer) Clone() Valuer {

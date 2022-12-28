@@ -33,6 +33,9 @@ func (v *valueConsumer) Format(f fmt.State, r rune) {
 }
 
 func (v *valueConsumer) clone() *valueConsumer {
+	if v == nil {
+		return nil
+	}
 	cloned := &valueConsumer{
 		dependency:   v.dependency.clone(),
 		baseConsumer: v.baseConsumer.clone(),

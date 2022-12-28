@@ -1,7 +1,6 @@
 package errors
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -23,7 +22,45 @@ func TestBugError(t *testing.T) {
 	assert.Equal(t, "looks like you have found a bug in uni.\n\tabc", err2.Error())
 }
 
-func TestStructError_WithMain(t *testing.T) {
+func Test_structError_HasError(t *testing.T) {
+	t.Run("error is nil", func(t *testing.T) {
+		var e *structError
+		assert.False(t, e.HasError())
+	})
+
+	t.Run("have main error", func(t *testing.T) {
+		e := Empty().WithMainf("main error")
+		assert.True(t, e.HasError())
+	})
+
+	t.Run("have sub error", func(t *testing.T) {
+		e := Empty().AddErrorf("sub error")
+		assert.True(t, e.HasError())
+	})
+
+	t.Run("no error", func(t *testing.T) {
+		e := Empty()
+		assert.False(t, e.HasError())
+
+		e2 := &structError{}
+		assert.False(t, e2.HasError())
+	})
+}
+
+func Test_structError_WithMain(t *testing.T) {
+	t.Run("error is nil", func(t *testing.T) {
+		var e0 *structError
+		e1 := Newf("main error")
+		e2 := e0.WithMain(e1)
+		assert.ErrorIs(t, e2, e1)
+	})
+
+	t.Run("main is nil", func(t *testing.T) {
+		var e0 *structError
+		e1 := e0.WithMain(nil)
+		assert.False(t, e1.HasError())
+	})
+
 	t.Run("single line", func(t *testing.T) {
 		se1 := Empty()
 		se2 := se1.WithMain(Newf("abc"))
@@ -47,7 +84,7 @@ func TestStructError_WithMain(t *testing.T) {
 	})
 }
 
-func TestStructError_AddSubError(t *testing.T) {
+func Test_structError_AddSubError(t *testing.T) {
 	t.Run("single line", func(t *testing.T) {
 		se1 := Empty()
 		se2 := se1.AddErrors(Newf("abc"))
@@ -76,7 +113,7 @@ func TestStructError_AddSubError(t *testing.T) {
 	})
 }
 
-func TestStructError_WithMainAndSub(t *testing.T) {
+func Test_structError_WithMainAndSub(t *testing.T) {
 	t.Run("simple case", func(t *testing.T) {
 		se1 := Empty()
 		se2 := se1.WithMainf("abc")
@@ -122,28 +159,142 @@ func TestStructError_WithMainAndSub(t *testing.T) {
 	})
 }
 
-func TestStructError_Is(t *testing.T) {
-	se1 := Empty()
-	sep1 := Empty()
-	assert.True(t, errors.Is(se1, sep1))
+func Test_structError_As(t *testing.T) {
+	t.Run("as *structError", func(t *testing.T) {
+		se1 := &structError{
+			mainError: Newf("abc"),
+			subErrors: []error{Newf("def"), Newf("ghi")},
+		}
+		var se2 *structError
+		ok := se1.As(&se2)
+		assert.True(t, ok)
+		assert.Same(t, se1, se2)
+	})
 
-	e1 := Newf("abc")
-	se2 := se1.WithMain(e1)
-	sep2 := sep1.WithMain(e1)
-	assert.True(t, errors.Is(se2, sep2))
+	t.Run("as StructError", func(t *testing.T) {
+		se1 := &structError{
+			mainError: Newf("abc"),
+			subErrors: []error{Newf("def"), Newf("ghi")},
+		}
+		var se2 StructError
+		ok := se1.As(&se2)
+		assert.True(t, ok)
+		assert.Same(t, se1, se2)
+	})
 
-	e2 := Newf("def")
-	se3 := se2.AddErrors(e2)
-	sep3 := sep2.AddErrors(e2)
-	assert.True(t, errors.Is(se3, sep3))
+	t.Run("main", func(t *testing.T) {
+		e := &testError{msg: "abc"}
+
+		se1 := &structError{
+			mainError: e,
+		}
+
+		var e2 *testError
+		ok := se1.As(&e2)
+		assert.True(t, ok)
+		assert.Same(t, e, e2)
+	})
+
+	t.Run("sub", func(t *testing.T) {
+		e := &testError{msg: "abc"}
+
+		se1 := &structError{
+			mainError: Newf("abc"),
+			subErrors: []error{Newf("def"), e},
+		}
+
+		var e2 *testError
+		ok := se1.As(&e2)
+		assert.True(t, ok)
+		assert.Same(t, e, e2)
+	})
 }
 
-func TestStructError_As(t *testing.T) {
-	se1 := Empty().WithMainf("abc").AddErrorf("def").AddErrorf("ghi")
+func TestIs(t *testing.T) {
+	t.Run("empty is empty", func(t *testing.T) {
+		se1 := Empty()
+		se2 := Empty()
+		assert.True(t, Is(se1, se2))
+	})
 
-	var se2 StructError
-	assert.True(t, errors.As(se1, &se2))
-	assert.Equal(t, se2.Error(), se1.Error())
+	t.Run("main error", func(t *testing.T) {
+		e := Newf("abc")
+		se1 := Empty().WithMain(e)
+		se2 := Empty().WithMain(e)
+		assert.True(t, Is(se1, se2))
+	})
+
+	t.Run("sub error", func(t *testing.T) {
+		e := Newf("abc")
+		se1 := Empty().AddErrors(e)
+		se2 := Empty().AddErrors(e)
+		assert.True(t, Is(se1, se2))
+	})
+
+	t.Run("complicated case", func(t *testing.T) {
+		e1 := Newf("abc")
+		e2 := Newf("def")
+		se1 := Empty().AddErrors(e1)
+		se2 := Empty().AddErrors(se1)
+		se3 := Empty().AddErrors(e1, e2)
+		se4 := Empty().AddErrors(se3)
+
+		assert.True(t, Is(se2, se4))
+		assert.True(t, Is(se4, se2))
+		assert.True(t, Is(se4, e2))
+		assert.False(t, Is(se2, e2))
+	})
+}
+
+func TestAs(t *testing.T) {
+	t.Run("as *structError", func(t *testing.T) {
+		se1 := &structError{
+			mainError: Newf("abc"),
+			subErrors: []error{Newf("def"), Newf("ghi")},
+		}
+		var se2 *structError
+		ok := As(se1, &se2)
+		assert.True(t, ok)
+		assert.Same(t, se1, se2)
+	})
+
+	t.Run("as StructError", func(t *testing.T) {
+		se1 := &structError{
+			mainError: Newf("abc"),
+			subErrors: []error{Newf("def"), Newf("ghi")},
+		}
+		var se2 StructError
+		ok := As(se1, &se2)
+		assert.True(t, ok)
+		assert.Same(t, se1, se2)
+	})
+
+	t.Run("main", func(t *testing.T) {
+		e := &testError{msg: "abc"}
+
+		se1 := &structError{
+			mainError: e,
+		}
+
+		var e2 *testError
+		ok := As(se1, &e2)
+		assert.True(t, ok)
+		assert.Same(t, e, e2)
+	})
+
+	t.Run("sub", func(t *testing.T) {
+		e := &testError{msg: "abc"}
+
+		se1 := &structError{
+			mainError: Newf("abc"),
+			subErrors: []error{Newf("def"), e},
+		}
+
+		var e2 *testError
+		ok := As(se1, &e2)
+		assert.True(t, ok)
+		assert.Same(t, e, e2)
+	})
 }
 
 type testError struct {
@@ -155,10 +306,29 @@ func (t *testError) Error() string {
 }
 
 func TestStructError_Unwrap(t *testing.T) {
-	e1 := &testError{"abc"}
-	se1 := Empty().WithMain(e1)
+	t.Run("have main", func(t *testing.T) {
+		e := Newf("abc")
+		e2 := &structError{
+			mainError: e,
+		}
+		assert.Same(t, e, e2.Unwrap())
+	})
 
-	var e2 *testError
-	assert.True(t, errors.As(se1, &e2))
-	assert.Equal(t, e2.Error(), "abc")
+	t.Run("have sub", func(t *testing.T) {
+		e := Newf("abc")
+		e2 := &structError{
+			subErrors: []error{e},
+		}
+		assert.Same(t, e, e2.Unwrap())
+	})
+
+	t.Run("empty", func(t *testing.T) {
+		e := &structError{}
+		assert.Nil(t, e.Unwrap())
+	})
+
+	t.Run("nil", func(t *testing.T) {
+		var e *structError
+		assert.Nil(t, e.Unwrap())
+	})
 }

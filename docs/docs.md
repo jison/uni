@@ -731,7 +731,7 @@ c1, _ := uni.NewContainer(m1)
 
 ctx := uni.WithContainerCtx(context.TODO(), c1)
 
-val, err := uni.ValueOfCtx(ctx, uni.TypeOf("")).Execute()
+val, err := uni.ValueOfCtx(ctx, uni.TypeOf(""))
 //...
 ```
 

@@ -6,6 +6,32 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type nilDiGraph struct{}
+
+func (n nilDiGraph) NodeAttrs(_ Node) (AttrsView, bool) {
+	return nil, false
+}
+
+func (n nilDiGraph) Nodes() NodeAndAttrsIterator {
+	return nil
+}
+
+func (n nilDiGraph) EdgeAttrs(_, _ Node) (AttrsView, bool) {
+	return nil, false
+}
+
+func (n nilDiGraph) Edges() EdgeAndAttrsIterator {
+	return nil
+}
+
+func (n nilDiGraph) OutEdgesOf(_ Node) EdgeAndAttrsIterator {
+	return nil
+}
+
+func (n nilDiGraph) InEdgesOf(_ Node) EdgeAndAttrsIterator {
+	return nil
+}
+
 func Test_filteredDigraph_EdgeAttrs(t *testing.T) {
 	t.Run("original graph is nil", func(t *testing.T) {
 		fg := &filteredDigraph{
@@ -147,6 +173,18 @@ func Test_filteredDigraph_InEdgesOf(t *testing.T) {
 		assert.Equal(t, EdgesWithAttrs{}, EdgesWithAttrsFrom(res))
 	})
 
+	t.Run("InEdgesOf of original graph return nil", func(t *testing.T) {
+		fg := &filteredDigraph{
+			oriGraph: nilDiGraph{},
+			nodePredicate: func(node Node) bool {
+				return node != 3
+			},
+		}
+
+		res := fg.InEdgesOf(2)
+		assert.Equal(t, EdgesWithAttrs{}, EdgesWithAttrsFrom(res))
+	})
+
 	tests := []struct {
 		name      string
 		predicate func(Node) bool
@@ -159,7 +197,16 @@ func Test_filteredDigraph_InEdgesOf(t *testing.T) {
 			1,
 			EdgesWithAttrs{},
 		},
-		{"edges is filtered out",
+		{"node has been filtered out",
+			func(node Node) bool { return node != 1 },
+			[]EdgeEntry{
+				{1, 2, Attrs{"a": "b"}}, {2, 3, Attrs{"c": "d"}},
+				{4, 2, Attrs{"c": "d"}},
+			},
+			1,
+			EdgesWithAttrs{},
+		},
+		{"edges have been filtered out",
 			func(node Node) bool { return node != 1 },
 			[]EdgeEntry{
 				{1, 2, Attrs{"a": "b"}}, {2, 3, Attrs{"c": "d"}},
@@ -168,7 +215,7 @@ func Test_filteredDigraph_InEdgesOf(t *testing.T) {
 			2,
 			EdgesWithAttrs{4: {2: {"c": "d"}}},
 		},
-		{"edges is filtered out 2",
+		{"edges have been filtered out 2",
 			func(node Node) bool { return node != 2 },
 			[]EdgeEntry{
 				{1, 2, Attrs{"a": "b"}},
@@ -327,6 +374,18 @@ func Test_filteredDigraph_OutEdgesOf(t *testing.T) {
 		assert.Equal(t, EdgesWithAttrs{}, EdgesWithAttrsFrom(res))
 	})
 
+	t.Run("OutEdgesOf of original graph return nil", func(t *testing.T) {
+		fg := &filteredDigraph{
+			oriGraph: nilDiGraph{},
+			nodePredicate: func(node Node) bool {
+				return node != 3
+			},
+		}
+
+		res := fg.OutEdgesOf(2)
+		assert.Equal(t, EdgesWithAttrs{}, EdgesWithAttrsFrom(res))
+	})
+
 	tests := []struct {
 		name      string
 		predicate func(Node) bool
@@ -338,6 +397,15 @@ func Test_filteredDigraph_OutEdgesOf(t *testing.T) {
 			[]EdgeEntry{{1, 2, Attrs{"a": "b"}}},
 			1,
 			EdgesWithAttrs{1: {2: {"a": "b"}}},
+		},
+		{"nodes has been filtered out",
+			func(node Node) bool { return node != 4 },
+			[]EdgeEntry{
+				{1, 2, Attrs{"a": "b"}}, {2, 3, Attrs{"c": "d"}},
+				{4, 2, Attrs{"c": "d"}}, {2, 4, Attrs{"e": "f"}},
+			},
+			4,
+			EdgesWithAttrs{},
 		},
 		{"edges has been filtered out",
 			func(node Node) bool { return node != 4 },
@@ -434,10 +502,7 @@ func Test_filteredEdgeIter_Iterate(t *testing.T) {
 		ei.Iterate(func(from Node, to Node, attrs AttrsView) bool {
 			k := key{from, to}
 			res[k] = struct{}{}
-			if len(res) >= 1 {
-				return false
-			}
-			return true
+			return len(res) < 1
 		})
 
 		assert.Equal(t, 1, len(res))
@@ -500,10 +565,7 @@ func Test_filteredNodeIter_Iterate(t *testing.T) {
 		ni.Iterate(func(node Node, attrs AttrsView) bool {
 			res[node] = struct{}{}
 
-			if len(res) >= 1 {
-				return false
-			}
-			return true
+			return len(res) < 1
 		})
 
 		assert.Equal(t, 1, len(res))

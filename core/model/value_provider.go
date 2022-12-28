@@ -62,6 +62,9 @@ func (vp *valueProvider) Format(f fmt.State, r rune) {
 }
 
 func (vp *valueProvider) clone() *valueProvider {
+	if vp == nil {
+		return nil
+	}
 	cloned := &valueProvider{
 		baseConsumer: vp.baseConsumer.clone(),
 		baseProvider: vp.baseProvider,
@@ -77,6 +80,11 @@ func (vp *valueProvider) Equal(other interface{}) bool {
 	if !ok {
 		return false
 	}
+
+	if vp == nil || o == nil {
+		return vp == nil && o == nil
+	}
+
 	if vp.baseConsumer != nil {
 		if !vp.baseConsumer.Equal(o.baseConsumer) {
 			return false
@@ -98,10 +106,6 @@ func (vp *valueProvider) Equal(other interface{}) bool {
 	}
 
 	return true
-}
-
-func (vp *valueProvider) String() string {
-	return fmt.Sprintf("%v", vp)
 }
 
 type ValueProviderBuilder interface {

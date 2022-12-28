@@ -105,11 +105,7 @@ func TestEdgesWithAttrs_Iterate(t *testing.T) {
 			k := key{from, to}
 			res[k] = struct{}{}
 
-			if len(res) >= 2 {
-				return false
-			}
-
-			return true
+			return len(res) < 2
 		})
 
 		assert.False(t, didNotInterrupted)
@@ -242,11 +238,7 @@ func Test_edgeIterator_InterruptDuringIteration(t *testing.T) {
 			k := key{from, to}
 			res[k] = struct{}{}
 
-			if len(res) >= 2 {
-				return false
-			}
-
-			return true
+			return len(res) < 2
 		})
 
 		assert.False(t, didNotInterrupted)
@@ -256,7 +248,7 @@ func Test_edgeIterator_InterruptDuringIteration(t *testing.T) {
 
 func TestEdgesWithAttrsFrom(t *testing.T) {
 	type args struct {
-		ei EdgesWithAttrs
+		ei EdgeAndAttrsIterator
 	}
 	tests := []struct {
 		name string

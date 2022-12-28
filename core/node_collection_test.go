@@ -53,6 +53,44 @@ func testNodeIterator(t *testing.T, ni NodeIterator, nodes []Node) {
 	})
 }
 
+func Test_filteredNodeIterator(t *testing.T) {
+	nodes := []Node{valuer.Identity(), valuer.Identity(), valuer.Identity(), valuer.Identity()}
+	set := map[Node]struct{}{}
+	var filteredNodes []Node
+	for _, n := range nodes {
+		if rand.Intn(2) == 0 {
+			continue
+		}
+		set[n] = struct{}{}
+		filteredNodes = append(filteredNodes, n)
+	}
+
+	predicate := func(node Node) bool {
+		_, ok := set[node]
+		return ok
+	}
+
+	type args struct {
+		original  NodeIterator
+		predicate func(Node) bool
+	}
+
+	tests := []struct {
+		name  string
+		args  args
+		nodes []Node
+	}{
+		{"original is nil", args{nil, predicate}, []Node{}},
+		{"predicate is nil", args{NodeSlice(nodes), nil}, nodes},
+		{"predicate is nil", args{NodeSlice(nodes), predicate}, filteredNodes},
+	}
+
+	for _, tt := range tests {
+		it := &filteredNodeIterator{tt.args.original, tt.args.predicate}
+		testNodeIterator(t, it, tt.nodes)
+	}
+}
+
 func testNodeCollection(t *testing.T, nc NodeCollection, nodes []Node, isRecursive bool) {
 	testNodeIterator(t, nc, nodes)
 
@@ -133,6 +171,25 @@ func testNodeSet(t *testing.T, ns NodeSet, nodes []Node, isRecursive bool) {
 	})
 }
 
+func Test_nodeCollection(t *testing.T) {
+	nodes := []Node{
+		valuer.Identity(), valuer.Identity(), valuer.Identity(),
+	}
+
+	tests := []struct {
+		name  string
+		it    NodeIterator
+		nodes []Node
+	}{
+		{"nil", nil, []Node{}},
+		{"not nil", NodeSlice(nodes), nodes},
+	}
+
+	for _, tt := range tests {
+		testNodeCollection(t, &nodeCollection{tt.it}, tt.nodes, false)
+	}
+}
+
 func TestNodeSlice(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -164,4 +221,51 @@ func TestNodeSet(t *testing.T) {
 		set := newNodeSet(tt.nodes...)
 		testNodeSet(t, set, tt.nodes, false)
 	}
+
+	t.Run("Add", func(t *testing.T) {
+		set := newNodeSet()
+
+		t.Run("Add nil", func(t *testing.T) {
+			l := set.Len()
+			set.Add(nil)
+			l2 := set.Len()
+			assert.Equal(t, l, l2)
+		})
+
+		t.Run("Add node", func(t *testing.T) {
+			l := set.Len()
+			set.Add(valuer.Identity())
+			l2 := set.Len()
+			assert.Equal(t, l+1, l2)
+		})
+
+		t.Run("Add node added before", func(t *testing.T) {
+			node := valuer.Identity()
+			set.Add(node)
+			l := set.Len()
+			set.Add(node)
+			l2 := set.Len()
+			assert.Equal(t, l, l2)
+		})
+	})
+
+	t.Run("Remove", func(t *testing.T) {
+		node := valuer.Identity()
+		set := newNodeSet(node)
+
+		t.Run("Remove nil", func(t *testing.T) {
+			l := set.Len()
+			set.Remove(nil)
+			l2 := set.Len()
+			assert.Equal(t, l, l2)
+		})
+
+		t.Run("Remove node", func(t *testing.T) {
+			l := set.Len()
+			set.Remove(node)
+			l2 := set.Len()
+			assert.Equal(t, l-1, l2)
+		})
+
+	})
 }

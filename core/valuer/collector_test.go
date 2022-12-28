@@ -21,18 +21,6 @@ func TestCollectorValuer(t *testing.T) {
 		assert.Equal(t, rVal.Interface(), []int{1, 2})
 	})
 
-	t.Run("wrong input type", func(t *testing.T) {
-		valuer := Collector(reflect.TypeOf(0))
-		inputs := ValuesOf(
-			1,
-			"abc",
-		)
-		res := valuer.Value(inputs)
-		err, ok := res.AsError()
-		assert.True(t, ok)
-		assert.NotNil(t, err)
-	})
-
 	t.Run("error input", func(t *testing.T) {
 		valuer := Collector(reflect.TypeOf(0))
 		err := errors.Newf("this is error")
@@ -47,40 +35,74 @@ func TestCollectorValuer(t *testing.T) {
 		assert.ErrorIs(t, err2, err)
 	})
 
-	t.Run("String", func(t *testing.T) {
-		valuer := Collector(reflect.TypeOf(0))
-		assert.Equal(t, "Collect: int", valuer.String())
+	t.Run("invalid input", func(t *testing.T) {
+		type testStruct struct {
+			a int
+		}
+		ts := testStruct{123}
+		tsVal := reflect.ValueOf(ts)
+
+		tests := []struct {
+			name  string
+			input Value
+		}{
+			{"input type is wrong", SingleValue(reflect.ValueOf("abc"))},
+			{"input is not a single value", ArrayValue([]reflect.Value{})},
+			{"CanInterface() is false", SingleValue(tsVal.FieldByName("a"))},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				valuer := Collector(reflect.TypeOf(0))
+				inputs := []Value{
+					SingleValue(reflect.ValueOf(1)),
+					tt.input,
+				}
+
+				res := valuer.Value(inputs)
+				err, ok := res.AsError()
+				assert.True(t, ok)
+				assert.NotNil(t, err)
+			})
+		}
 	})
+}
 
-	t.Run("Clone", func(t *testing.T) {
+func Test_collectorValuer_String(t *testing.T) {
+	valuer := Collector(reflect.TypeOf(0))
+	assert.Equal(t, "Collect: int", valuer.String())
+}
+
+func Test_collectorValuer_Clone(t *testing.T) {
+	v1 := Collector(reflect.TypeOf(0))
+	v2 := v1.Clone()
+
+	assert.False(t, v1 == v2)
+	assert.Equal(t, v1, v2)
+	assert.True(t, v1.Equal(v2))
+}
+
+func Test_collectorValuer_Equal(t *testing.T) {
+	t.Run("equal", func(t *testing.T) {
 		v1 := Collector(reflect.TypeOf(0))
-		v2 := v1.Clone()
-
-		assert.False(t, v1 == v2)
-		assert.Equal(t, v1, v2)
+		v2 := Collector(reflect.TypeOf(0))
 		assert.True(t, v1.Equal(v2))
 	})
 
-	t.Run("Equal", func(t *testing.T) {
-		t.Run("equal", func(t *testing.T) {
-			v1 := Collector(reflect.TypeOf(0))
-			v2 := Collector(reflect.TypeOf(0))
-			assert.True(t, v1.Equal(v2))
-		})
+	t.Run("not equal", func(t *testing.T) {
+		v1 := Collector(reflect.TypeOf(0))
+		v2 := Collector(reflect.TypeOf(""))
+		v3 := Identity()
+		assert.False(t, v1.Equal(v2))
+		assert.False(t, v1.Equal(v3))
+	})
 
-		t.Run("not equal", func(t *testing.T) {
-			v1 := Collector(reflect.TypeOf(0))
-			v2 := Collector(reflect.TypeOf(""))
-			assert.False(t, v1.Equal(v2))
-		})
-
-		t.Run("nil", func(t *testing.T) {
-			var v1 *collectorValuer
-			var v2 *collectorValuer
-			var v3 = Collector(reflect.TypeOf(0))
-			assert.True(t, v1.Equal(v2))
-			assert.False(t, v1.Equal(v3))
-			assert.False(t, v3.Equal(v1))
-		})
+	t.Run("nil", func(t *testing.T) {
+		var v1 *collectorValuer
+		var v2 *collectorValuer
+		var v3 = Collector(reflect.TypeOf(0))
+		assert.True(t, v1.Equal(v2))
+		assert.False(t, v1.Equal(v3))
+		assert.False(t, v3.Equal(v1))
 	})
 }

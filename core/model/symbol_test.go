@@ -23,10 +23,17 @@ func TestSymbol(t *testing.T) {
 		assert.False(t, s1 == s2)
 	})
 
-	t.Run("string", func(t *testing.T) {
+	t.Run("ID", func(t *testing.T) {
+		s1 := NewSymbol("s")
+		s2 := NewSymbol("s")
+
+		assert.NotEqual(t, s1.ID(), s2.ID())
+	})
+
+	t.Run("Format", func(t *testing.T) {
 		s1 := NewSymbol("symbol1")
 
-		assert.Equal(t, "github.com/jison/uni/core/model.TestSymbol.func3.symbol1", fmt.Sprintf("%+v", s1))
+		assert.Equal(t, "github.com/jison/uni/core/model.TestSymbol.func4.symbol1", fmt.Sprintf("%+v", s1))
 		assert.Equal(t, "symbol1", fmt.Sprintf("%v", s1))
 	})
 }

@@ -56,6 +56,6 @@ see [docs/docs.md](docs/docs.md)
 ## Todo
 
 - [ ] add command tools to improve debug experience
-- [ ] add support for recovering of function provider panic
+- [ ] add support for recovering from function provider panic
 - [ ] TBD: add decorator support for components
-- [ ] TBD: add mock api for components 
+- [ ] TBD: add mock api for components

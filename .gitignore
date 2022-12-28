@@ -7,9 +7,15 @@
 
 # Test binary, built with `go test -c`
 *.test
-
-# Output of the go coverage tool, specifically when used with LiteIDE
+*.mem
+*.cpu
+*.test
+*.log
 *.out
+*.html
+*.coverprofile
+coverage.txt
+*.pprof
 
 # Dependency directories (remove the comment below to include it)
 # vendor/

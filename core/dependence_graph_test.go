@@ -12,23 +12,27 @@ import (
 	"github.com/jison/uni/graph"
 )
 
+//lint:ignore U1000 we need the field name to locate the field
 type testStruct struct {
 	a int
 	b string
 }
 
+//lint:ignore U1000 we need the field name to locate the field
 type testStruct2 struct {
 	ts3 *testStruct3
 	a   int
 	b   string
 }
 
+//lint:ignore U1000 we need the field name to locate the field
 type testStruct3 struct {
 	ts2 *testStruct2
 	a   int
 	b   string
 }
 
+//lint:ignore U1000 we need the field name to locate the field
 type testStruct4 struct {
 	ti testInterface
 	a  int
@@ -36,6 +40,26 @@ type testStruct4 struct {
 }
 
 type testInterface interface{}
+
+func Test_nodeAttrKey_String(t *testing.T) {
+	tests := []struct {
+		name string
+		key  nodeAttrKey
+		want string
+	}{
+		{"provider", nodeAttrKeyProvider, "provider"},
+		{"consumer", nodeAttrKeyConsumer, "consumer"},
+		{"component", nodeAttrKeyComponent, "component"},
+		{"dependency", nodeAttrKeyDependency, "dependency"},
+		{"other", nodeAttrKey(100000), ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, tt.key.String())
+		})
+	}
+}
 
 func buildTestModule() (model.Module, model.Scope, model.Scope, model.Scope) {
 	var scope1 = model.NewScope("scope1")
@@ -529,24 +553,27 @@ func Test_dependenceGraph_InputComponentsToDependency(t *testing.T) {
 	g, rep := buildTestGraph()
 
 	tests := []struct {
+		name      string
 		comName   string
 		typeOfDep reflect.Type
 		inputComs []string
 	}{
-		{"name6", model.TypeOf(""), []string{"name4"}},
-		{"name6", model.TypeOf(0), []string{"name1", "name3"}},
-		{"name7", model.TypeOf(""), []string{"name4"}},
-		{"name7", model.TypeOf(0), []string{"name2"}},
-		{"name7", model.TypeOf(&testStruct3{}), []string{"name8"}},
-		{"name8", model.TypeOf(""), []string{"name5"}},
-		{"name8", model.TypeOf(0), []string{"name1"}},
-		{"name8", model.TypeOf(&testStruct2{}), []string{"name7"}},
-		{"name9", model.TypeOf(""), []string{"name4"}},
-		{"name9", model.TypeOf(0), []string{"name1"}},
-		{"name10", model.TypeOf(""), []string{"name4", "name5"}},
-		{"name10", model.TypeOf(0), []string{"name1", "name2"}},
-		{"name10", model.TypeOf((*testInterface)(nil)), []string{"name8"}},
-		{"name11", model.TypeOf((*testInterface)(nil)), []string{"name8", "name10"}},
+		{"case 1", "name6", model.TypeOf(""), []string{"name4"}},
+		{"case 2", "name6", model.TypeOf(0), []string{"name1", "name3"}},
+		{"case 3", "name7", model.TypeOf(""), []string{"name4"}},
+		{"case 4", "name7", model.TypeOf(0), []string{"name2"}},
+		{"case 5", "name7", model.TypeOf(&testStruct3{}), []string{"name8"}},
+		{"case 6", "name8", model.TypeOf(""), []string{"name5"}},
+		{"case 7", "name8", model.TypeOf(0), []string{"name1"}},
+		{"case 8", "name8", model.TypeOf(&testStruct2{}), []string{"name7"}},
+		{"case 9", "name9", model.TypeOf(""), []string{"name4"}},
+		{"case 10", "name9", model.TypeOf(0), []string{"name1"}},
+		{"case 11", "name10", model.TypeOf(""), []string{"name4", "name5"}},
+		{"case 12", "name10", model.TypeOf(0), []string{"name1", "name2"}},
+		{"case 13", "name10", model.TypeOf((*testInterface)(nil)),
+			[]string{"name8"}},
+		{"case 14", "name11", model.TypeOf((*testInterface)(nil)),
+			[]string{"name8", "name10"}},
 	}
 
 	for _, tt := range tests {
@@ -714,10 +741,10 @@ func Test_dependenceGraph_Derive(t *testing.T) {
 			return true
 		})
 
-		node, ok := g.NodeOfConsumer(con)
-		assert.False(t, ok)
-		node, ok = dg.NodeOfConsumer(con)
-		assert.True(t, ok)
+		_, ok1 := g.NodeOfConsumer(con)
+		assert.False(t, ok1)
+		node, ok2 := dg.NodeOfConsumer(con)
+		assert.True(t, ok2)
 		assert.Equal(t, con.Valuer(), node)
 	})
 
@@ -738,11 +765,11 @@ func Test_dependenceGraph_Derive(t *testing.T) {
 		})
 
 		con.Dependencies().Iterate(func(dep model.Dependency) bool {
-			node, ok := g.NodeOfDependency(dep)
-			assert.False(t, ok)
+			_, ok1 := g.NodeOfDependency(dep)
+			assert.False(t, ok1)
 
-			node, ok = dg.NodeOfDependency(dep)
-			assert.True(t, ok)
+			node, ok2 := dg.NodeOfDependency(dep)
+			assert.True(t, ok2)
 			assert.Same(t, dep.Valuer(), node)
 			return true
 		})
@@ -765,11 +792,11 @@ func Test_dependenceGraph_Derive(t *testing.T) {
 		})
 
 		con.Dependencies().Iterate(func(dep model.Dependency) bool {
-			val, ok := g.DependencyOfNode(dep.Valuer())
-			assert.False(t, ok)
+			_, ok1 := g.DependencyOfNode(dep.Valuer())
+			assert.False(t, ok1)
 
-			val, ok = dg.DependencyOfNode(dep.Valuer())
-			assert.True(t, ok)
+			val, ok2 := dg.DependencyOfNode(dep.Valuer())
+			assert.True(t, ok2)
 			assert.Same(t, dep, val)
 			return true
 		})
@@ -789,10 +816,10 @@ func Test_dependenceGraph_Derive(t *testing.T) {
 			return true
 		})
 
-		val, ok := g.ConsumerOfNode(con.Valuer())
-		assert.False(t, ok)
-		val, ok = dg.ConsumerOfNode(con.Valuer())
-		assert.True(t, ok)
+		_, ok1 := g.ConsumerOfNode(con.Valuer())
+		assert.False(t, ok1)
+		val, ok2 := dg.ConsumerOfNode(con.Valuer())
+		assert.True(t, ok2)
 		assert.Equal(t, con, val)
 	})
 
@@ -983,4 +1010,88 @@ func Test_dependenceGraph_Derive(t *testing.T) {
 			})
 		})
 	})
+}
+
+func newDependenceGraphForTest(coms model.ComponentCollection) *dependenceGraph {
+	rep := model.NewRepository(coms)
+
+	return &dependenceGraph{
+		parent:           nil,
+		graph:            graph.NewDirectedGraph(),
+		repository:       rep,
+		nodeByComponent:  map[model.Component]Node{},
+		nodeByConsumer:   map[model.Consumer]Node{},
+		nodeByDependency: map[model.Dependency]Node{},
+	}
+}
+
+func Test_dependenceGraph_addNodeOfComponent(t *testing.T) {
+	pro := model.Func(func(_ int) string { return "" }).Provider()
+	com := pro.Components().ToArray()[0]
+
+	g := newDependenceGraphForTest(pro.Components())
+
+	_, ok := g.NodeOfComponent(com)
+	assert.False(t, ok)
+	node1 := g.addNodeOfComponent(com)
+	node2, ok2 := g.NodeOfComponent(com)
+	assert.True(t, ok2)
+	assert.Same(t, node1, node2)
+
+	node3 := g.addNodeOfComponent(com)
+	assert.Same(t, node1, node3)
+}
+
+func Test_dependenceGraph_addNodeOfProvider(t *testing.T) {
+	pro := model.Func(func(_ int) string { return "" }).Provider()
+
+	g := newDependenceGraphForTest(pro.Components())
+
+	_, ok := g.NodeOfProvider(pro)
+	assert.False(t, ok)
+	node1 := g.addNodeOfProvider(pro)
+	node2, ok2 := g.NodeOfProvider(pro)
+	assert.True(t, ok2)
+	assert.Same(t, node1, node2)
+
+	node3 := g.addNodeOfProvider(pro)
+	assert.Same(t, node1, node3)
+}
+
+func Test_dependenceGraph_addNodeOfConsumer(t *testing.T) {
+	con := model.FuncConsumer(func(_ int) string { return "" }).Consumer()
+
+	g := newDependenceGraphForTest(model.EmptyComponents())
+
+	_, ok := g.NodeOfConsumer(con)
+	assert.False(t, ok)
+	node1 := g.addNodeOfConsumer(con)
+	node2, ok2 := g.NodeOfConsumer(con)
+	assert.True(t, ok2)
+	assert.Same(t, node1, node2)
+
+	node3 := g.addNodeOfConsumer(con)
+	assert.Same(t, node1, node3)
+}
+
+func Test_dependenceGraph_addNodeOfDependency(t *testing.T) {
+	con := model.FuncConsumer(func(a int) int { return a }).Consumer()
+
+	var dep model.Dependency
+	con.Dependencies().Iterate(func(d model.Dependency) bool {
+		dep = d
+		return false
+	})
+
+	g := newDependenceGraphForTest(model.EmptyComponents())
+
+	_, ok := g.NodeOfDependency(dep)
+	assert.False(t, ok)
+	node1 := g.addNodeOfDependency(dep)
+	node2, ok2 := g.NodeOfDependency(dep)
+	assert.True(t, ok2)
+	assert.Same(t, node1, node2)
+
+	node3 := g.addNodeOfDependency(dep)
+	assert.Same(t, node1, node3)
 }

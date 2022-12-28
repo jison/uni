@@ -14,7 +14,7 @@ func newComponentForTest() *component {
 	return &component{}
 }
 
-func testComponentIterator(t *testing.T, ni ComponentIterator, coms []Component) {
+func testComponentIterator(t *testing.T, it ComponentIterator, coms []Component) {
 	t.Run("iterate", func(t *testing.T) {
 		m1 := map[Component]struct{}{}
 		m2 := map[Component]struct{}{}
@@ -23,7 +23,7 @@ func testComponentIterator(t *testing.T, ni ComponentIterator, coms []Component)
 			m1[c] = struct{}{}
 		}
 
-		r := ni.Iterate(func(com Component) bool {
+		r := it.Iterate(func(com Component) bool {
 			m2[com] = struct{}{}
 			return true
 		})
@@ -35,7 +35,7 @@ func testComponentIterator(t *testing.T, ni ComponentIterator, coms []Component)
 	t.Run("interrupt", func(t *testing.T) {
 		if len(coms) == 0 {
 			n := 0
-			r := ni.Iterate(func(com Component) bool {
+			r := it.Iterate(func(com Component) bool {
 				n += 1
 				return false
 			})
@@ -43,7 +43,7 @@ func testComponentIterator(t *testing.T, ni ComponentIterator, coms []Component)
 			assert.Equal(t, 0, n)
 		} else {
 			var half []Component
-			r := ni.Iterate(func(com Component) bool {
+			r := it.Iterate(func(com Component) bool {
 				half = append(half, com)
 				return len(half) < len(coms)/2
 			})
@@ -66,6 +66,38 @@ func componentIteratorToArray(it ComponentIterator) []Component {
 		return true
 	})
 	return arr
+}
+
+func TestFuncComponentIterator(t *testing.T) {
+	com1 := &component{}
+	com2 := &component{}
+	com3 := &component{}
+
+	tests := []struct {
+		name string
+		coms []Component
+		want []Component
+	}{
+		{"nil", nil, []Component{}},
+		{"0", []Component{}, []Component{}},
+		{"1", []Component{com1}, []Component{com1}},
+		{"2", []Component{com1, com2}, []Component{com1, com2}},
+		{"n", []Component{com1, com2, com3}, []Component{com1, com2, com3}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			it := FuncComponentIterator(func(f func(Component) bool) bool {
+				for _, c := range tt.coms {
+					if !f(c) {
+						return false
+					}
+				}
+				return true
+			})
+			testComponentIterator(t, it, tt.want)
+		})
+	}
 }
 
 func Test_filteredComponentIterator(t *testing.T) {
@@ -211,12 +243,14 @@ func Test_distinctComponentIterator(t *testing.T) {
 		var coms []Component
 		for i := 0; i < 10; i++ {
 			c := newComponentForTest()
-			cs = append(cs, c)
-			cs = append(cs, c)
+			cs = append(cs, c, c)
 			coms = append(coms, c)
 		}
 
-		testComponentIterator(t, cs, coms)
+		it := &distinctComponentIterator{cs}
+		assert.Equal(t, len(coms), len(ComponentsOfIterator(it).ToArray()))
+
+		testComponentIterator(t, it, coms)
 	})
 
 	t.Run("does not have same components", func(t *testing.T) {
@@ -228,7 +262,9 @@ func Test_distinctComponentIterator(t *testing.T) {
 			coms = append(coms, c)
 		}
 
-		testComponentIterator(t, cs, coms)
+		it := &distinctComponentIterator{cs}
+		assert.Equal(t, len(coms), len(ComponentsOfIterator(it).ToArray()))
+		testComponentIterator(t, it, coms)
 	})
 }
 
@@ -322,6 +358,10 @@ func testComponentCollection(t *testing.T, cc ComponentCollection, coms []Compon
 
 		t.Run("verbose", func(t *testing.T) {
 			test("%+v")
+		})
+
+		t.Run("#", func(t *testing.T) {
+			test("%#v")
 		})
 	})
 }

@@ -51,6 +51,39 @@ func Test_singleValue(t *testing.T) {
 		assert.False(t, ok)
 		assert.Nil(t, arr)
 	})
+
+	t.Run("Interface", func(t *testing.T) {
+		t.Run("value is invalid", func(t *testing.T) {
+			sv := &singleValue{val: reflect.ValueOf(nil)}
+			_, err := sv.Interface()
+			assert.NotNil(t, err)
+		})
+
+		t.Run("value can not Interface()", func(t *testing.T) {
+			type testStruct struct {
+				a int
+			}
+			ts := testStruct{123}
+			tsVal := reflect.ValueOf(ts)
+			sv := &singleValue{val: tsVal.FieldByName("a")}
+			_, err := sv.Interface()
+			assert.NotNil(t, err)
+		})
+
+		t.Run("can Interface()", func(t *testing.T) {
+			val := 123
+			sv := &singleValue{val: reflect.ValueOf(val)}
+			val2, err := sv.Interface()
+			assert.Nil(t, err)
+			assert.Equal(t, val, val2)
+		})
+	})
+
+	t.Run("initialized", func(t *testing.T) {
+		val := 123
+		sv := &singleValue{val: reflect.ValueOf(val)}
+		assert.True(t, sv.Initialized())
+	})
 }
 
 func Test_errorValue(t *testing.T) {
@@ -94,6 +127,20 @@ func Test_errorValue(t *testing.T) {
 		assert.False(t, ok)
 		assert.Nil(t, arr)
 	})
+
+	t.Run("Interface", func(t *testing.T) {
+		err := errors.Newf("this is an error")
+		ev := &errorValue{err: err}
+		val, err2 := ev.Interface()
+		assert.Nil(t, val)
+		assert.Equal(t, err, err2)
+	})
+
+	t.Run("initialized", func(t *testing.T) {
+		err := errors.Newf("this is an error")
+		ev := &errorValue{err: err}
+		assert.True(t, ev.Initialized())
+	})
 }
 
 func Test_arrayValue(t *testing.T) {
@@ -127,6 +174,20 @@ func Test_arrayValue(t *testing.T) {
 		vals2, ok := av.AsArray()
 		assert.True(t, ok)
 		assert.Equal(t, vals, vals2)
+	})
+
+	t.Run("Interface", func(t *testing.T) {
+		vals, _ := reflecting.ReflectValuesOf(123, "abc")
+		av := &arrayValue{arr: vals}
+		val, err := av.Interface()
+		assert.Nil(t, err)
+		assert.Equal(t, []interface{}{123, "abc"}, val)
+	})
+
+	t.Run("initialized", func(t *testing.T) {
+		vals, _ := reflecting.ReflectValuesOf(123, "abc")
+		av := &arrayValue{arr: vals}
+		assert.True(t, av.Initialized())
 	})
 }
 
@@ -177,6 +238,27 @@ func Test_lazyValue(t *testing.T) {
 		res, ok := lv.AsArray()
 		assert.True(t, ok)
 		assert.Equal(t, vals, res)
+	})
+
+	t.Run("Interface", func(t *testing.T) {
+		lv := lazyValue{f: func() Value {
+			return SingleValue(reflect.ValueOf(1))
+		}}
+		val, err := lv.Interface()
+		assert.Nil(t, err)
+		assert.Equal(t, 1, val)
+	})
+
+	t.Run("initialized", func(t *testing.T) {
+		vals, _ := reflecting.ReflectValuesOf(123, "abc")
+		lv := lazyValue{f: func() Value {
+			return ArrayValue(vals)
+		}}
+		assert.False(t, lv.Initialized())
+
+		_, _ = lv.AsArray()
+
+		assert.True(t, lv.Initialized())
 	})
 }
 

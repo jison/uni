@@ -154,10 +154,6 @@ func (a *derivedAttrs) Iterate(f func(key interface{}, value interface{}) bool) 
 	})
 }
 
-func (a *derivedAttrs) initialized() bool {
-	return true
-}
-
 type derivedNodeWithAttrs struct {
 	derivedGraph DirectedGraph
 	parent       NodeAndAttrsIterator
@@ -346,7 +342,7 @@ func (g *derivedDirectedGraph) Edges() EdgeAndAttrsIterator {
 }
 
 func (g *derivedDirectedGraph) OutEdgesOf(node Node) EdgeAndAttrsIterator {
-	if g == nil {
+	if g == nil || !canBeNode(node) {
 		return emptyEdgeIterator{}
 	}
 
@@ -365,7 +361,7 @@ func (g *derivedDirectedGraph) OutEdgesOf(node Node) EdgeAndAttrsIterator {
 }
 
 func (g *derivedDirectedGraph) InEdgesOf(node Node) EdgeAndAttrsIterator {
-	if g == nil {
+	if g == nil || !canBeNode(node) {
 		return emptyEdgeIterator{}
 	}
 
@@ -444,10 +440,7 @@ func (g *derivedDirectedGraph) AddEdgeWithAttrs(from Node, to Node, attrs AttrsV
 		g.AddNodeWithAttrs(to, nil)
 	}
 
-	edgeAttrs, ok := g.getEdgeAttrs(from, to, true)
-	if !ok {
-		return
-	}
+	edgeAttrs, _ := g.getEdgeAttrs(from, to, true)
 	if isAttrsDeleted(edgeAttrs) {
 		restoreAttrs(edgeAttrs)
 	}

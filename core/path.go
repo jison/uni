@@ -93,7 +93,6 @@ func (p *pathNode) Reversed() Path {
 }
 
 func (p *pathNode) Iterate(f func(node Node) bool) bool {
-	first := p
 	cur := p
 	for cur != nil {
 		if cur.node != nil && cur.nodeNum > 0 {
@@ -103,9 +102,6 @@ func (p *pathNode) Iterate(f func(node Node) bool) bool {
 		}
 
 		cur = cur.prev
-		if cur == first {
-			break
-		}
 	}
 	return true
 }
@@ -114,7 +110,7 @@ func (p *pathNode) Format(fs fmt.State, r rune) {
 	if p.Len() == 0 {
 		_, _ = fmt.Fprint(fs, "empty path")
 	} else {
-		_, _ = fmt.Fprint(fs, "path:\n")
+		_, _ = fmt.Fprint(fs, "path:")
 		_formatNodes(p.graph, p, fs, r)
 	}
 }
@@ -124,22 +120,22 @@ func _formatNodes(graph DependenceGraph, ni NodeIterator, fs fmt.State, r rune) 
 
 	ni.Iterate(func(node Node) bool {
 		if dep, ok := graph.DependencyOfNode(node); ok {
-			_, _ = fmt.Fprintf(fs, "\t%v\n", dep)
+			_, _ = fmt.Fprintf(fs, "\n\t%v", dep)
 			return true
 		}
 
 		if com, ok := graph.ComponentOfNode(node); ok {
-			_, _ = fmt.Fprintf(fs, "\t%v\n", com)
+			_, _ = fmt.Fprintf(fs, "\n\t%v", com)
 			return true
 		}
 
 		if pro, ok := graph.ProviderOfNode(node); ok {
-			_, _ = fmt.Fprintf(fs, "\t%+v\n", pro)
+			_, _ = fmt.Fprintf(fs, "\n\t%+v", pro)
 			return true
 		}
 
 		if con, ok := graph.ConsumerOfNode(node); ok {
-			_, _ = fmt.Fprintf(fs, "\t%+v\n", con)
+			_, _ = fmt.Fprintf(fs, "\n\t%+v", con)
 			return true
 		}
 
@@ -147,7 +143,7 @@ func _formatNodes(graph DependenceGraph, ni NodeIterator, fs fmt.State, r rune) 
 			return true
 		}
 
-		_, _ = fmt.Fprintf(fs, "\t%v\n", node)
+		_, _ = fmt.Fprintf(fs, "\n\t%v", node)
 
 		return true
 	})

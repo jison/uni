@@ -25,7 +25,7 @@ func (ni *filteredNodeIterator) Iterate(f func(Node) bool) bool {
 	}
 
 	if ni.predicate == nil {
-		return ni.Iterate(f)
+		return ni.original.Iterate(f)
 	}
 
 	return ni.original.Iterate(func(node Node) bool {
@@ -99,22 +99,40 @@ type nodeCollection struct {
 }
 
 func (nc *nodeCollection) Iterate(f func(Node) bool) bool {
+	if nc.ni == nil {
+		return true
+	}
 	return nc.ni.Iterate(f)
 }
 
 func (nc *nodeCollection) Each(f func(Node)) {
+	if nc.ni == nil {
+		return
+	}
 	_nodesEach(nc.ni, f)
 }
 
 func (nc *nodeCollection) Filter(f func(Node) bool) NodeCollection {
+	if nc.ni == nil {
+		return NodeSlice{}
+	}
+
 	return _nodesFilter(nc.ni, f)
 }
 
 func (nc *nodeCollection) ToArray() NodeSlice {
+	if nc.ni == nil {
+		return NodeSlice{}
+	}
+
 	return _nodesToArray(nc.ni)
 }
 
 func (nc *nodeCollection) ToSet() NodeSet {
+	if nc.ni == nil {
+		return nodeSet{}
+	}
+
 	return _nodesToSet(nc.ni)
 }
 

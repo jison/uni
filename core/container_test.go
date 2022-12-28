@@ -47,7 +47,7 @@ func Test_NewContainer(t *testing.T) {
 
 	t.Run("ignore missing", func(t *testing.T) {
 		m := model.NewModule(model.Func(func(int) string { return "" }))
-		c, err := NewContainer(m)
+		_, err := NewContainer(m)
 		assert.NotNil(t, err)
 
 		c, err2 := NewContainer(m, IgnoreMissing())
@@ -61,7 +61,7 @@ func Test_NewContainer(t *testing.T) {
 			model.Value(456),
 			model.Func(func(int) string { return "" }),
 		)
-		c, err := NewContainer(m)
+		_, err := NewContainer(m)
 		assert.NotNil(t, err)
 
 		c, err2 := NewContainer(m, IgnoreUncertain())
@@ -74,7 +74,7 @@ func Test_NewContainer(t *testing.T) {
 			model.Func(func(string) int { return 0 }),
 			model.Func(func(int) string { return "" }),
 		)
-		c, err := NewContainer(m)
+		_, err := NewContainer(m)
 		assert.NotNil(t, err)
 
 		c, err2 := NewContainer(m, IgnoreCycle())
@@ -89,6 +89,11 @@ func Test_newContainer(t *testing.T) {
 		c, err := newContainer(m, nil)
 		assert.Nil(t, err)
 		assert.NotNil(t, c)
+	})
+
+	t.Run("module is nil", func(t *testing.T) {
+		_, err := newContainer(nil, nil)
+		assert.NotNil(t, err)
 	})
 
 	t.Run("error in module", func(t *testing.T) {
@@ -152,6 +157,12 @@ func Test_container_Load(t *testing.T) {
 		err = c1.Load(model.NewCriteria(testStruct{}), model.NewCriteria(testStruct2{}))
 		assert.NotNil(t, err)
 	})
+
+	t.Run("container is nil", func(t *testing.T) {
+		var c *container
+		err := c.Load()
+		assert.NotNil(t, err)
+	})
 }
 
 func Test_container_LoadAll(t *testing.T) {
@@ -168,7 +179,7 @@ func Test_container_LoadAll(t *testing.T) {
 
 		runCount := 0
 		m.AllComponents().Filter(func(com model.Component) bool {
-			return com.Name() == "name3" || com.Name() == "name4"
+			return com.Name() == "name2" || com.Name() == "name3" || com.Name() == "name4"
 		}).Iterate(func(com model.Component) bool {
 			runCount += 1
 			_, ok := c2.storage.Get(com.Valuer(), com.Provider().Scope())
@@ -176,7 +187,13 @@ func Test_container_LoadAll(t *testing.T) {
 			return true
 		})
 
-		assert.Equal(t, 2, runCount)
+		assert.Equal(t, 3, runCount)
+	})
+
+	t.Run("container is nil", func(t *testing.T) {
+		var c *container
+		err := c.LoadAll()
+		assert.NotNil(t, err)
 	})
 }
 
@@ -304,6 +321,12 @@ func Test_container_FuncOf(t *testing.T) {
 		assert.NotNil(t, err2)
 		assert.False(t, errors.Is(err2, err))
 	})
+
+	t.Run("container is nil", func(t *testing.T) {
+		var c *container
+		err := c.FuncOf(func() {})
+		assert.NotNil(t, err)
+	})
 }
 
 func Test_container_StructOf(t *testing.T) {
@@ -321,6 +344,12 @@ func Test_container_StructOf(t *testing.T) {
 			a: 123,
 			b: "abc",
 		}, ret)
+	})
+
+	t.Run("container is nil", func(t *testing.T) {
+		var c *container
+		err := c.StructOf(model.TypeOf(testStruct{}))
+		assert.NotNil(t, err)
 	})
 }
 
@@ -367,14 +396,37 @@ func Test_container_ValueOf(t *testing.T) {
 		assert.Contains(t, arr, 123)
 		assert.Contains(t, arr, 456)
 	})
+
+	t.Run("container is nil", func(t *testing.T) {
+		var c *container
+		err := c.ValueOf(model.TypeOf(0))
+		assert.NotNil(t, err)
+	})
+}
+
+func Test_container_ExecutorOf(t *testing.T) {
+	t.Run("container is nil", func(t *testing.T) {
+		var c *container
+		exe := c.ExecutorOf(model.ValueConsumer(0))
+		_, err := exe.Execute()
+		assert.NotNil(t, err)
+	})
 }
 
 func Test_container_Scope(t *testing.T) {
-	m, scope1, _ := buildModuleForContainerTest()
-	c, _ := newContainer(m, nil)
-	assert.Equal(t, model.GlobalScope, c.Scope())
-	c1, _ := c.EnterScope(scope1)
-	assert.Equal(t, scope1, c1.Scope())
+	t.Run("scope", func(t *testing.T) {
+		m, scope1, _ := buildModuleForContainerTest()
+		c, _ := newContainer(m, nil)
+		assert.Equal(t, model.GlobalScope, c.Scope())
+		c1, _ := c.EnterScope(scope1)
+		assert.Equal(t, scope1, c1.Scope())
+	})
+
+	t.Run("container is nil", func(t *testing.T) {
+		var c *container
+		s := c.Scope()
+		assert.Nil(t, s)
+	})
 }
 
 func Test_container_EnterScope(t *testing.T) {
@@ -426,6 +478,13 @@ func Test_container_EnterScope(t *testing.T) {
 		ret4, _ := exe2.Execute()
 		assert.Equal(t, 2, ret4.(int))
 	})
+
+	t.Run("container is nil", func(t *testing.T) {
+		scope1 := model.NewScope("scope1")
+		var c *container
+		_, err := c.EnterScope(scope1)
+		assert.NotNil(t, err)
+	})
 }
 
 func Test_container_LeaveScope(t *testing.T) {
@@ -441,5 +500,11 @@ func Test_container_LeaveScope(t *testing.T) {
 		assert.Equal(t, model.GlobalScope, c4.Scope())
 		c5 := c4.LeaveScope()
 		assert.Equal(t, model.GlobalScope, c5.Scope())
+	})
+
+	t.Run("container is nil", func(t *testing.T) {
+		var c *container
+		c2 := c.LeaveScope()
+		assert.Nil(t, c2)
 	})
 }

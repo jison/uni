@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestIdentityValuer(t *testing.T) {
+func Test_identityValuer_Value(t *testing.T) {
 
 	t.Run("no error input", func(t *testing.T) {
 		valuer := Identity()
@@ -37,41 +37,42 @@ func TestIdentityValuer(t *testing.T) {
 		v2 := Identity()
 		assert.True(t, v1 != v2)
 	})
+}
 
-	t.Run("String", func(t *testing.T) {
-		valuer := Identity()
-		assert.Equal(t, "identity", valuer.String())
-	})
+func Test_identityValuer_String(t *testing.T) {
+	valuer := Identity()
+	assert.Equal(t, "identity", valuer.String())
+}
 
-	t.Run("Clone", func(t *testing.T) {
+func Test_identityValuer_Clone(t *testing.T) {
+	v1 := Identity()
+	v2 := v1.Clone()
+
+	assert.False(t, v1 == v2)
+	assert.Equal(t, v1, v2)
+	assert.True(t, v1.Equal(v2))
+}
+
+func Test_identityValuer_Equal(t *testing.T) {
+	t.Run("equal", func(t *testing.T) {
 		v1 := Identity()
-		v2 := v1.Clone()
-
-		assert.False(t, v1 == v2)
-		assert.Equal(t, v1, v2)
+		v2 := Identity()
 		assert.True(t, v1.Equal(v2))
 	})
 
-	t.Run("Equal", func(t *testing.T) {
-		t.Run("equal", func(t *testing.T) {
-			v1 := Identity()
-			v2 := Identity()
-			assert.True(t, v1.Equal(v2))
-		})
+	t.Run("not equal", func(t *testing.T) {
+		v1 := Identity()
+		v2 := OneOf()
+		assert.False(t, v1.Equal(v2))
+	})
 
-		t.Run("not equal", func(t *testing.T) {
-			v1 := Identity()
-			v2 := OneOf()
-			assert.False(t, v1.Equal(v2))
-		})
-
-		t.Run("nil", func(t *testing.T) {
-			var v1 *identityValuer
-			var v2 *identityValuer
-			var v3 = &identityValuer{}
-			assert.True(t, v1.Equal(v2))
-			assert.True(t, v1.Equal(v3))
-			assert.True(t, v3.Equal(v1))
-		})
+	t.Run("nil", func(t *testing.T) {
+		var v1 *identityValuer
+		var v2 *identityValuer
+		var v3 = &identityValuer{}
+		assert.True(t, v1.Equal(v2))
+		assert.True(t, v1.Equal(v3))
+		assert.True(t, v3.Equal(v1))
+		assert.True(t, v1.Equal(nil))
 	})
 }

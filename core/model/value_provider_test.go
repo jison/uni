@@ -89,13 +89,24 @@ func Test_valueProvider_Provider(t *testing.T) {
 		assert.True(t, p.Valuer() == p.Valuer())
 	})
 
-	t.Run("Location", func(t *testing.T) {
+	t.Run("UpdateCallLocation", func(t *testing.T) {
 		baseLoc := location.GetCallLocation(0)
-		vp := Value(123, Name("abc"))
+		var vp ValueProviderBuilder
+		func() {
+			vp = Value(123, Name("abc"), UpdateCallLocation())
+		}()
+
+		p := vp.Provider()
+		assert.Equal(t, baseLoc.FileName(), p.Location().FileName())
+		assert.Equal(t, baseLoc.FileLine()+4, p.Location().FileLine())
+	})
+
+	t.Run("Location", func(t *testing.T) {
+		loc1 := location.GetCallLocation(0)
+		vp := Value(123, Name("abc"), Location(loc1))
 		p := vp.Provider()
 
-		assert.Equal(t, baseLoc.FileName(), p.Location().FileName())
-		assert.Equal(t, baseLoc.FileLine()+1, p.Location().FileLine())
+		assert.Equal(t, loc1, p.Location())
 	})
 
 	t.Run("Components", func(t *testing.T) {
@@ -154,7 +165,17 @@ func Test_valueProvider_Provider(t *testing.T) {
 		})
 
 		t.Run("value CanInterface() is false", func(t *testing.T) {
-			// can not construct a value CanInterface() is false, and pass to Value
+			type testStruct struct {
+				a int
+			}
+			ts := testStruct{123}
+			tsVal := reflect.ValueOf(ts)
+
+			vp := valueProviderOf(123)
+			vp.value = tsVal.FieldByName("a")
+			p := vp.Provider()
+			err := p.Validate()
+			assert.NotNil(t, err)
 		})
 
 		t.Run("value is error", func(t *testing.T) {
@@ -414,6 +435,11 @@ func Test_valueProvider_clone(t *testing.T) {
 
 		verifyProvider(t, vp3.Provider())
 	})
+
+	t.Run("nil", func(t *testing.T) {
+		var vp2 *valueProvider
+		assert.Nil(t, vp2.clone())
+	})
 }
 
 func Test_valuerProvider_Equal(t *testing.T) {
@@ -435,10 +461,35 @@ func Test_valuerProvider_Equal(t *testing.T) {
 		assert.True(t, vp2.Equal(vp))
 	})
 
-	t.Run("baseConsumer", func(t *testing.T) {
+	t.Run("not equal to non funcProvider", func(t *testing.T) {
 		vp2 := vp.clone()
-		vp2.SetLocation(location.GetCallLocation(0))
-		assert.False(t, vp2.Equal(vp))
+		fp := funcProviderOf(func() int { return 0 })
+		assert.False(t, vp2.Equal(fp))
+	})
+
+	t.Run("nil equal nil", func(t *testing.T) {
+		var vp2 *valueProvider
+		var vp3 *valueProvider
+		assert.True(t, vp2.Equal(vp3))
+	})
+
+	t.Run("baseConsumer", func(t *testing.T) {
+		t.Run("not nil", func(t *testing.T) {
+			vp2 := vp.clone()
+			vp2.SetLocation(location.GetCallLocation(0))
+			assert.False(t, vp2.Equal(vp))
+		})
+
+		t.Run("nil", func(t *testing.T) {
+			vp2 := vp.clone()
+			vp2.baseConsumer = nil
+			assert.False(t, vp2.Equal(vp))
+			assert.False(t, vp.Equal(vp2))
+
+			vp3 := vp.clone()
+			vp3.baseConsumer = nil
+			assert.True(t, vp3.Equal(vp2))
+		})
 	})
 
 	t.Run("value", func(t *testing.T) {
@@ -448,8 +499,21 @@ func Test_valuerProvider_Equal(t *testing.T) {
 	})
 
 	t.Run("component", func(t *testing.T) {
-		vp2 := vp.clone()
-		vp2.SetName("def")
-		assert.False(t, vp2.Equal(vp))
+		t.Run("not nil", func(t *testing.T) {
+			vp2 := vp.clone()
+			vp2.SetName("def")
+			assert.False(t, vp2.Equal(vp))
+		})
+
+		t.Run("nil", func(t *testing.T) {
+			vp2 := vp.clone()
+			vp2.com = nil
+			assert.False(t, vp2.Equal(vp))
+			assert.False(t, vp.Equal(vp2))
+
+			vp3 := vp.clone()
+			vp3.com = nil
+			assert.True(t, vp3.Equal(vp2))
+		})
 	})
 }

@@ -41,10 +41,11 @@ func ReflectFuncOfFunc(f reflect.Value) ReflectFunc {
 				continue
 			}
 			if i == funcType.NumIn()-1 && funcType.IsVariadic() {
-				if param.Type().Kind() != reflect.Slice {
-					errs = errs.AddErrors(errors.Bugf("variadic param should pass slice value"))
-					continue
-				}
+				// if function is variadic then the last parameter should be slice type
+				//if param.Type().Kind() != reflect.Slice {
+				//	errs = errs.AddErrors(errors.Bugf("variadic param should pass slice value"))
+				//	continue
+				//}
 				for ii := 0; ii < param.Len(); ii++ {
 					params = append(params, param.Index(ii))
 				}
@@ -64,21 +65,23 @@ func ReflectFuncOfFunc(f reflect.Value) ReflectFunc {
 			if IsErrorType(outType) {
 				errVal := rValues[i]
 
-				if !errVal.IsValid() {
-					errs = errs.AddErrors(errors.Newf("provider function return an invalid value"))
-					continue
-				}
+				// can not construct a invalid return value
+				//if !errVal.IsValid() {
+				//	errs = errs.AddErrors(errors.Newf("provider function return an invalid value"))
+				//	continue
+				//}
+
 				if errVal.IsNil() {
 					continue
 				}
-				var err error
-				if !errVal.CanInterface() {
-					err = errors.Newf("error can not convert to interface{}")
-				} else {
-					err = errVal.Interface().(error)
-				}
 
-				errs = errs.AddErrors(err)
+				// can not construct a return value that CanInterface() is false
+				//if !errVal.CanInterface() {
+				//	errs = errs.AddErrors(errors.Newf("error can not convert to interface{}"))
+				//	continue
+				//}
+
+				errs = errs.AddErrors(errVal.Interface().(error))
 			}
 		}
 
@@ -87,41 +90,5 @@ func ReflectFuncOfFunc(f reflect.Value) ReflectFunc {
 		}
 
 		return rValues, nil
-	}
-}
-
-func ReflectFuncOfStruct(rType reflect.Type, isPtr bool) ReflectFunc {
-	if rType.Kind() != reflect.Struct {
-		err := errors.Bugf("parameter of type %v is not a struct", rType)
-		return reflectFuncOfError(err)
-	}
-
-	return func(params []reflect.Value) ([]reflect.Value, error) {
-		val := reflect.New(rType).Elem()
-		paramIndex := 0
-		for i := 0; i < rType.NumField(); i++ {
-			if !val.Field(i).CanSet() {
-				continue
-			}
-
-			if paramIndex >= len(params) {
-				if len(params) != rType.NumField() {
-					return nil, errors.Bugf("len of param does not match the struct needs")
-				}
-			}
-
-			val.Field(i).Set(params[paramIndex])
-			paramIndex += 1
-		}
-
-		if isPtr {
-			if !val.CanAddr() {
-				return nil, errors.Newf("value of %v is not addressable", rType)
-			}
-
-			val = val.Addr()
-		}
-
-		return []reflect.Value{val}, nil
 	}
 }

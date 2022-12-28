@@ -55,41 +55,42 @@ func TestOneOfValuer(t *testing.T) {
 		v2 := OneOf()
 		assert.True(t, v1 != v2)
 	})
+}
 
-	t.Run("String", func(t *testing.T) {
-		valuer := OneOf()
-		assert.Equal(t, "OneOf", valuer.String())
-	})
+func Test_oneOf_String(t *testing.T) {
+	valuer := OneOf()
+	assert.Equal(t, "OneOf", valuer.String())
+}
 
-	t.Run("Clone", func(t *testing.T) {
+func Test_oneOf_Clone(t *testing.T) {
+	v1 := OneOf()
+	v2 := v1.Clone()
+
+	assert.False(t, v1 == v2)
+	assert.Equal(t, v1, v2)
+	assert.True(t, v1.Equal(v2))
+}
+
+func Test_oneOf_Equal(t *testing.T) {
+	t.Run("equal", func(t *testing.T) {
 		v1 := OneOf()
-		v2 := v1.Clone()
-
-		assert.False(t, v1 == v2)
-		assert.Equal(t, v1, v2)
+		v2 := OneOf()
 		assert.True(t, v1.Equal(v2))
 	})
 
-	t.Run("Equal", func(t *testing.T) {
-		t.Run("equal", func(t *testing.T) {
-			v1 := OneOf()
-			v2 := OneOf()
-			assert.True(t, v1.Equal(v2))
-		})
+	t.Run("not equal", func(t *testing.T) {
+		v1 := Identity()
+		v2 := OneOf()
+		assert.False(t, v1.Equal(v2))
+	})
 
-		t.Run("not equal", func(t *testing.T) {
-			v1 := Identity()
-			v2 := OneOf()
-			assert.False(t, v1.Equal(v2))
-		})
-
-		t.Run("nil", func(t *testing.T) {
-			var v1 *oneOfValuer
-			var v2 *oneOfValuer
-			var v3 = &oneOfValuer{}
-			assert.True(t, v1.Equal(v2))
-			assert.True(t, v1.Equal(v3))
-			assert.True(t, v3.Equal(v1))
-		})
+	t.Run("nil", func(t *testing.T) {
+		var v1 *oneOfValuer
+		var v2 *oneOfValuer
+		var v3 = &oneOfValuer{}
+		assert.True(t, v1.Equal(v2))
+		assert.True(t, v1.Equal(v3))
+		assert.True(t, v3.Equal(v1))
+		assert.True(t, v1.Equal(nil))
 	})
 }

@@ -154,6 +154,10 @@ func (c *container) ValueOf(t model.TypeVal, opts ...model.ValueConsumerOption) 
 }
 
 func (c *container) ExecutorOf(cb model.ConsumerBuilder) Executor {
+	if c == nil {
+		return newExecutorWithError(errors.Newf("container is nil"))
+	}
+
 	return newExecutor(c.graph, c.storage, cb.Consumer())
 }
 
@@ -165,10 +169,17 @@ func (c *container) newContainerWithStorage(storage *scopeStorage) *container {
 }
 
 func (c *container) Scope() model.Scope {
+	if c == nil {
+		return nil
+	}
 	return c.storage.Scope()
 }
 
 func (c *container) EnterScope(s model.Scope) (Container, error) {
+	if c == nil {
+		return nil, errors.Newf("container is nil")
+	}
+
 	newStorage, err := c.storage.Enter(s)
 	if err != nil {
 		return nil, err
@@ -178,6 +189,10 @@ func (c *container) EnterScope(s model.Scope) (Container, error) {
 }
 
 func (c *container) LeaveScope() Container {
+	if c == nil {
+		return nil
+	}
+
 	oldStorage := c.storage.Leave()
 	if oldStorage == nil {
 		return c

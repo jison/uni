@@ -326,6 +326,7 @@ func TestInScope(t *testing.T) {
 }
 
 func TestWithScope(t *testing.T) {
+	//lint:ignore U1000 we need the field name to locate the field
 	type testStruct struct {
 		a int
 	}

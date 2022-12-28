@@ -71,6 +71,20 @@ func Test_executor(t *testing.T) {
 		}, val)
 	})
 
+	t.Run("consumer with error", func(t *testing.T) {
+		consumer := model.StructConsumer(
+			model.TypeOf(12), // not struct type
+			model.InScope(scope3),
+		).Consumer()
+
+		ss0 := newScopeStorage()
+		ss3, _ := ss0.Enter(scope3)
+
+		exe := newExecutor(g, ss3, consumer)
+		_, err := exe.Execute()
+		assert.NotNil(t, err)
+	})
+
 	t.Run("not unique dependencies", func(t *testing.T) {
 		consumer := model.StructConsumer(
 			model.TypeOf(testStruct{}),

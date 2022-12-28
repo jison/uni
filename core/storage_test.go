@@ -13,6 +13,56 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func Test_scopeStorage_Get(t *testing.T) {
+	scope1 := model.NewScope("scope1")
+	scope2 := model.NewScope("scope2", scope1)
+	scope3 := model.NewScope("scope3")
+
+	ss := newScopeStorage()
+	ss1, _ := ss.Enter(scope1)
+	ss2, _ := ss1.Enter(scope2)
+
+	node1 := valuer.Identity()
+	node2 := valuer.Identity()
+	node3 := valuer.Identity()
+
+	_, _ = ss2.GetOrElse(node1, scope1, func(storage ScopeBaseStorage) valuer.Value {
+		return valuer.SingleValue(reflect.ValueOf(1))
+	}).AsSingle()
+	_, _ = ss2.GetOrElse(node2, scope2, func(storage ScopeBaseStorage) valuer.Value {
+		return valuer.SingleValue(reflect.ValueOf(2))
+	}).AsSingle()
+
+	t.Run("in current scope", func(t *testing.T) {
+		t.Run("have value", func(t *testing.T) {
+			val, ok := ss2.Get(node2, scope2)
+			assert.True(t, ok)
+			v, ok2 := val.AsSingle()
+			assert.True(t, ok2)
+			assert.Equal(t, reflect.ValueOf(2), v)
+		})
+
+		t.Run("have not value", func(t *testing.T) {
+			_, ok := ss2.Get(node3, scope2)
+			assert.False(t, ok)
+		})
+
+	})
+
+	t.Run("in parent scope", func(t *testing.T) {
+		val, ok := ss2.Get(node1, scope1)
+		assert.True(t, ok)
+		v, ok2 := val.AsSingle()
+		assert.True(t, ok2)
+		assert.Equal(t, reflect.ValueOf(1), v)
+	})
+
+	t.Run("have not value", func(t *testing.T) {
+		_, ok := ss2.Get(node3, scope3)
+		assert.False(t, ok)
+	})
+}
+
 func Test_scopeStorage_GetOrElse(t *testing.T) {
 	scope1 := model.NewScope("scope1")
 	scope2 := model.NewScope("scope2", scope1)
@@ -67,6 +117,18 @@ func Test_scopeStorage_GetOrElse(t *testing.T) {
 		assert.True(t, ok2)
 		assert.Equal(t, reflect.ValueOf(456), rVal2)
 		assert.Equal(t, 2, runCount)
+	})
+
+	t.Run("scope is nil and valSupplier is nil", func(t *testing.T) {
+		ss := newScopeStorage()
+		ss1, _ := ss.Enter(scope1)
+		ss2, _ := ss1.Enter(scope2)
+
+		node := valuer.Identity()
+		val := ss2.GetOrElse(node, nil, nil)
+		err, ok := val.AsError()
+		assert.True(t, ok)
+		assert.NotNil(t, err)
 	})
 
 	t.Run("scope have not entered", func(t *testing.T) {

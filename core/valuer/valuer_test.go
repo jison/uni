@@ -27,7 +27,7 @@ func (v testValuer) Equal(other interface{}) bool {
 	return ok
 }
 
-func TestOneInputValuer(t *testing.T) {
+func Test_oneInputValuer_Value(t *testing.T) {
 	t.Run("only one input", func(t *testing.T) {
 		oneInput := &oneInputValuer{testValuer{}}
 
@@ -53,37 +53,42 @@ func TestOneInputValuer(t *testing.T) {
 		assert.True(t, ok)
 		assert.NotNil(t, err)
 	})
+}
 
-	t.Run("clone", func(t *testing.T) {
+func Test_oneInputValuer_String(t *testing.T) {
+	v1 := &oneInputValuer{testValuer{}}
+	assert.Equal(t, "test", v1.String())
+}
+
+func Test_oneInputValuer_Clone(t *testing.T) {
+	v1 := &oneInputValuer{testValuer{}}
+	v2 := v1.Clone()
+
+	assert.Equal(t, v1, v2)
+	assert.False(t, v1 == v2)
+	assert.True(t, v1.Equal(v2))
+}
+
+func Test_oneInputValuer_Equal(t *testing.T) {
+	t.Run("equal", func(t *testing.T) {
 		v1 := &oneInputValuer{testValuer{}}
-		v2 := v1.Clone()
+		v2 := &oneInputValuer{testValuer{}}
 
-		assert.Equal(t, v1, v2)
-		assert.False(t, v1 == v2)
 		assert.True(t, v1.Equal(v2))
 	})
+	t.Run("not equal", func(t *testing.T) {
+		v1 := &oneInputValuer{testValuer{}}
+		v2 := &oneInputValuer{&identityValuer{}}
 
-	t.Run("equal", func(t *testing.T) {
-		t.Run("equal", func(t *testing.T) {
-			v1 := &oneInputValuer{testValuer{}}
-			v2 := &oneInputValuer{testValuer{}}
+		assert.False(t, v1.Equal(v2))
+	})
+	t.Run("nil", func(t *testing.T) {
+		var v1 *oneInputValuer
+		var v2 *oneInputValuer
+		var v3 = &oneInputValuer{testValuer{}}
 
-			assert.True(t, v1.Equal(v2))
-		})
-		t.Run("not equal", func(t *testing.T) {
-			v1 := &oneInputValuer{testValuer{}}
-			v2 := &oneInputValuer{&identityValuer{}}
-
-			assert.False(t, v1.Equal(v2))
-		})
-		t.Run("nil", func(t *testing.T) {
-			var v1 *oneInputValuer
-			var v2 *oneInputValuer
-			var v3 = &oneInputValuer{testValuer{}}
-
-			assert.True(t, v1.Equal(v2))
-			assert.False(t, v1.Equal(v3))
-			assert.False(t, v3.Equal(v1))
-		})
+		assert.True(t, v1.Equal(v2))
+		assert.False(t, v1.Equal(v3))
+		assert.False(t, v3.Equal(v1))
 	})
 }

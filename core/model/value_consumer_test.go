@@ -98,11 +98,22 @@ func Test_valueConsumer_Consumer(t *testing.T) {
 	})
 
 	t.Run("Location", func(t *testing.T) {
+		loc1 := location.GetCallLocation(0)
+		vc := ValueConsumer(TypeOf(1), Location(loc1))
+		con := vc.Consumer()
+		assert.Equal(t, loc1, con.Location())
+	})
+
+	t.Run("UpdateCallLocation", func(t *testing.T) {
 		baseLoc := location.GetCallLocation(0)
-		vc := ValueConsumer(TypeOf(1))
+		var vc ValueConsumerBuilder
+		func() {
+			vc = ValueConsumer(TypeOf(1), UpdateCallLocation())
+		}()
+
 		con := vc.Consumer()
 		assert.Equal(t, baseLoc.FileName(), con.Location().FileName())
-		assert.Equal(t, baseLoc.FileLine()+1, con.Location().FileLine())
+		assert.Equal(t, baseLoc.FileLine()+4, con.Location().FileLine())
 	})
 
 	t.Run("Validate", func(t *testing.T) {
@@ -355,6 +366,11 @@ func Test_valueConsumer_clone(t *testing.T) {
 
 		verifyConsumer(t, vc3.Consumer())
 	})
+
+	t.Run("nil", func(t *testing.T) {
+		var vc2 *valueConsumer
+		assert.Nil(t, vc2.clone())
+	})
 }
 
 func Test_valueConsumer_equal(t *testing.T) {
@@ -374,17 +390,57 @@ func Test_valueConsumer_equal(t *testing.T) {
 		assert.True(t, vc2.Equal(vc))
 	})
 
-	t.Run("dependency", func(t *testing.T) {
+	t.Run("nil == nil", func(t *testing.T) {
+		var vc1 *valueConsumer
+		var vc2 *valueConsumer
+		assert.True(t, vc1.Equal(vc2))
+	})
+
+	t.Run("other consumer", func(t *testing.T) {
 		vc2 := vc.clone()
-		vc2.SetName("def")
-		assert.False(t, vc2.Equal(vc))
+		fc := funcConsumerOf(func(int) {})
+		assert.False(t, vc2.Equal(fc))
+	})
+
+	t.Run("dependency", func(t *testing.T) {
+		t.Run("not nil", func(t *testing.T) {
+			vc2 := vc.clone()
+			vc2.SetName("def")
+			assert.False(t, vc2.Equal(vc))
+		})
+
+		t.Run("nil", func(t *testing.T) {
+			vc2 := vc.clone()
+			vc2.dependency = nil
+			assert.False(t, vc2.Equal(vc))
+			assert.False(t, vc.Equal(vc2))
+
+			vc3 := vc.clone()
+			vc3.dependency = nil
+			assert.True(t, vc3.Equal(vc2))
+		})
+
 	})
 
 	t.Run("baseConsumer", func(t *testing.T) {
-		loc2 := location.GetCallLocation(0)
+		t.Run("not nil", func(t *testing.T) {
+			loc2 := location.GetCallLocation(0)
 
-		vc2 := vc.clone()
-		vc2.SetLocation(loc2)
-		assert.False(t, vc2.Equal(vc))
+			vc2 := vc.clone()
+			vc2.SetLocation(loc2)
+			assert.False(t, vc2.Equal(vc))
+		})
+
+		t.Run("nil", func(t *testing.T) {
+			vc2 := vc.clone()
+			vc2.baseConsumer = nil
+			assert.False(t, vc2.Equal(vc))
+			assert.False(t, vc.Equal(vc2))
+
+			vc3 := vc.clone()
+			vc3.baseConsumer = nil
+			assert.True(t, vc3.Equal(vc2))
+		})
+
 	})
 }

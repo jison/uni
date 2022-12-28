@@ -10,7 +10,7 @@ import (
 
 func TestNewCriteria(t *testing.T) {
 	type structForCriteriaTest struct {
-		a int
+		_ int
 	}
 
 	t.Run("NewCriteria", func(t *testing.T) {
@@ -155,6 +155,11 @@ func Test_criteria_clone(t *testing.T) {
 		assert.Equal(t, newSymbolSet(tag1), cri.Tags())
 		assert.Equal(t, "abc", cri.Name())
 	})
+
+	t.Run("nil", func(t *testing.T) {
+		var c2 *criteria
+		assert.Nil(t, c2.clone())
+	})
 }
 
 func Test_criteria_equal(t *testing.T) {
@@ -170,6 +175,16 @@ func Test_criteria_equal(t *testing.T) {
 	t.Run("equal", func(t *testing.T) {
 		c2 := c1.clone()
 		assert.True(t, c2.Equal(c1))
+	})
+
+	t.Run("not equal to non criteria", func(t *testing.T) {
+		assert.False(t, c1.Equal(123))
+	})
+
+	t.Run("nil equal nil", func(t *testing.T) {
+		var c2 *criteria
+		var c3 *criteria
+		assert.True(t, c2.Equal(c3))
 	})
 
 	t.Run("type", func(t *testing.T) {

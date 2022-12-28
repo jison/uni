@@ -8,6 +8,142 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func testModuleIterator(t *testing.T, it ModuleIterator, modules []Module) {
+	t.Run("iterate", func(t *testing.T) {
+		m1 := map[Module]struct{}{}
+		m2 := map[Module]struct{}{}
+
+		for _, m := range modules {
+			m1[m] = struct{}{}
+		}
+
+		r := it.Iterate(func(m Module) bool {
+			m2[m] = struct{}{}
+			return true
+		})
+
+		assert.True(t, r)
+		assert.Equal(t, m1, m2)
+	})
+
+	t.Run("interrupt", func(t *testing.T) {
+		if len(modules) == 0 {
+			n := 0
+			r := it.Iterate(func(_ Module) bool {
+				n += 1
+				return false
+			})
+			assert.True(t, r)
+			assert.Equal(t, 0, n)
+		} else {
+			var half []Module
+			r := it.Iterate(func(m Module) bool {
+				half = append(half, m)
+				return len(half) < len(modules)/2
+			})
+
+			assert.False(t, r)
+
+			expected := len(modules) / 2
+			if expected == 0 {
+				expected = 1
+			}
+			assert.Equal(t, expected, len(half))
+		}
+	})
+}
+
+func testProviderIterator(t *testing.T, it ProviderIterator, providers []Provider) {
+	t.Run("iterate", func(t *testing.T) {
+		m1 := map[Provider]struct{}{}
+		m2 := map[Provider]struct{}{}
+
+		for _, p := range providers {
+			m1[p] = struct{}{}
+		}
+
+		r := it.Iterate(func(p Provider) bool {
+			m2[p] = struct{}{}
+			return true
+		})
+
+		assert.True(t, r)
+		assert.Equal(t, m1, m2)
+	})
+
+	t.Run("interrupt", func(t *testing.T) {
+		if len(providers) == 0 {
+			n := 0
+			r := it.Iterate(func(_ Provider) bool {
+				n += 1
+				return false
+			})
+			assert.True(t, r)
+			assert.Equal(t, 0, n)
+		} else {
+			var half []Provider
+			r := it.Iterate(func(p Provider) bool {
+				half = append(half, p)
+				return len(half) < len(providers)/2
+			})
+
+			assert.False(t, r)
+
+			expected := len(providers) / 2
+			if expected == 0 {
+				expected = 1
+			}
+			assert.Equal(t, expected, len(half))
+		}
+	})
+}
+
+func Test_moduleSet(t *testing.T) {
+	m1 := NewModule()
+	m2 := NewModule()
+	m3 := NewModule()
+
+	tests := []struct {
+		name string
+		set  moduleSet
+		want []Module
+	}{
+		{"nil", nil, []Module{}},
+		{"0", moduleSet{}, []Module{}},
+		{"1", moduleSet{m1: {}}, []Module{m1}},
+		{"n", moduleSet{m1: {}, m2: {}, m3: {}}, []Module{m1, m2, m3}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testModuleIterator(t, tt.set, tt.want)
+		})
+	}
+}
+
+func Test_providerSet(t *testing.T) {
+	p1 := Value(1).Provider()
+	p2 := Value(2).Provider()
+	p3 := Value(3).Provider()
+
+	tests := []struct {
+		name string
+		set  providerSet
+		want []Provider
+	}{
+		{"nil", nil, []Provider{}},
+		{"1", providerSet{}, []Provider{}},
+		{"2", providerSet{p1: {}}, []Provider{p1}},
+		{"n", providerSet{p1: {}, p2: {}, p3: {}}, []Provider{p1, p2, p3}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testProviderIterator(t, tt.set, tt.want)
+		})
+	}
+}
+
 func Test_module_Module(t *testing.T) {
 	type testStruct struct {
 		a int
@@ -550,6 +686,58 @@ func TestNewModule(t *testing.T) {
 		)
 		m2 := NewModule(SubModule(m))
 
+		coms := m2.AllComponents().ToArray()
+		assert.Equal(t, 3, len(coms))
+		meetValue := false
+		meetStruct := false
+		meetFunc := false
+		for _, com := range coms {
+			if com.Name() == "value" {
+				meetValue = true
+				assert.Equal(t, TypeOf(0), com.Type())
+			} else if com.Name() == "struct" {
+				meetStruct = true
+				assert.Equal(t, TypeOf(testStruct{}), com.Type())
+			} else if com.Name() == "return" {
+				meetFunc = true
+				assert.Equal(t, TypeOf(&testStruct{}), com.Type())
+			}
+		}
+		assert.True(t, meetValue)
+		assert.True(t, meetStruct)
+		assert.True(t, meetFunc)
+	})
+}
+
+type nilProviderBuilder struct{}
+
+func (n nilProviderBuilder) Provider() Provider {
+	return nil
+}
+
+func Test_newModule(t *testing.T) {
+	type testStruct struct {
+		a int
+		b string
+	}
+	testFunc := func(a int, b string) (*testStruct, error) {
+		return &testStruct{a, b}, nil
+	}
+
+	t.Run("newModule", func(t *testing.T) {
+		m := NewModule(
+			Value(1, Name("value")),
+			Struct(testStruct{}, Name("struct")),
+			nil,
+		)
+		m2 := newModule(
+			[]Module{m, nil},
+			[]ProviderBuilder{
+				Func(testFunc, Return(0, Name("return"))),
+				nilProviderBuilder{},
+				nil,
+			},
+		)
 		coms := m2.AllComponents().ToArray()
 		assert.Equal(t, 3, len(coms))
 		meetValue := false

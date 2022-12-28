@@ -167,6 +167,12 @@ func TestHasNode(t *testing.T) {
 }
 
 func TestPredecessorsOf(t *testing.T) {
+	t.Run("InEdgesOf of graph return nil", func(t *testing.T) {
+		g := nilDiGraph{}
+		predecessors := PredecessorsOf(g, 1)
+		assert.Equal(t, NodesWithAttrs{}, NodesWithAttrsFrom(predecessors))
+	})
+
 	t.Run("node value is invalid", func(t *testing.T) {
 		g := NewDirectedGraph()
 		assert.NotPanics(t, func() {
@@ -333,6 +339,19 @@ func TestSubGraphOf(t *testing.T) {
 }
 
 func TestSubGraphWithNodes(t *testing.T) {
+	t.Run("node value is invalid", func(t *testing.T) {
+		g := NewDirectedGraph()
+		AddEdge(g, 1, 2)
+		AddEdge(g, 2, 3)
+		AddEdges(g, [][2]Node{{1, 2}, {2, 3}, {2, 4}, {3, 4}})
+
+		sg := NewDirectedGraphWithInNodes(g, []Node{
+			1, 3, 4,
+			nil, []interface{}{1}, map[interface{}]interface{}{1: 1}, func() {}})
+		assert.Equal(t, NodesWithAttrs{1: Attrs{}, 3: Attrs{}, 4: Attrs{}}, NodesWithAttrsFrom(sg.Nodes()))
+		assert.Equal(t, EdgesWithAttrs{3: {4: {}}}, EdgesWithAttrsFrom(sg.Edges()))
+	})
+
 	t.Run("subgraph", func(t *testing.T) {
 		g := NewDirectedGraph()
 		AddEdge(g, 1, 2)
@@ -346,6 +365,12 @@ func TestSubGraphWithNodes(t *testing.T) {
 }
 
 func TestSuccessorsOf(t *testing.T) {
+	t.Run("OutEdgesOf of graph return nil", func(t *testing.T) {
+		g := nilDiGraph{}
+		successors := SuccessorsOf(g, 1)
+		assert.Equal(t, NodesWithAttrs{}, NodesWithAttrsFrom(successors))
+	})
+
 	t.Run("node value is invalid", func(t *testing.T) {
 		g := NewDirectedGraph()
 		assert.NotPanics(t, func() {
@@ -434,10 +459,6 @@ func TestAddNodesWithAttrs(t *testing.T) {
 }
 
 func TestAddEdgesWithAttrs(t *testing.T) {
-	type args struct {
-		g     DirectedGraph
-		edges EdgesWithAttrs
-	}
 	tests := []struct {
 		name  string
 		edges EdgesWithAttrs

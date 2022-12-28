@@ -52,11 +52,11 @@ type filteredDigraph struct {
 }
 
 func (g *filteredDigraph) NodeAttrs(node Node) (AttrsView, bool) {
-	if g.nodePredicate != nil && !g.nodePredicate(node) {
+	if g.oriGraph == nil {
 		return nil, false
 	}
 
-	if g.oriGraph == nil {
+	if g.nodePredicate != nil && !g.nodePredicate(node) {
 		return nil, false
 	}
 
@@ -75,11 +75,11 @@ func (g *filteredDigraph) Nodes() NodeAndAttrsIterator {
 }
 
 func (g *filteredDigraph) EdgeAttrs(from, to Node) (AttrsView, bool) {
-	if g.nodePredicate != nil && !(g.nodePredicate(from) && g.nodePredicate(to)) {
+	if g.oriGraph == nil {
 		return nil, false
 	}
 
-	if g.oriGraph == nil {
+	if g.nodePredicate != nil && !(g.nodePredicate(from) && g.nodePredicate(to)) {
 		return nil, false
 	}
 
@@ -98,11 +98,11 @@ func (g *filteredDigraph) Edges() EdgeAndAttrsIterator {
 }
 
 func (g *filteredDigraph) OutEdgesOf(node Node) EdgeAndAttrsIterator {
-	if g.nodePredicate != nil && !g.nodePredicate(node) {
+	if g.oriGraph == nil {
 		return emptyEdgeIterator{}
 	}
 
-	if g.oriGraph == nil {
+	if g.nodePredicate != nil && !g.nodePredicate(node) {
 		return emptyEdgeIterator{}
 	}
 
@@ -118,11 +118,11 @@ func (g *filteredDigraph) OutEdgesOf(node Node) EdgeAndAttrsIterator {
 }
 
 func (g *filteredDigraph) InEdgesOf(node Node) EdgeAndAttrsIterator {
-	if g.nodePredicate != nil && !g.nodePredicate(node) {
+	if g.oriGraph == nil {
 		return emptyEdgeIterator{}
 	}
 
-	if g.oriGraph == nil {
+	if g.nodePredicate != nil && !g.nodePredicate(node) {
 		return emptyEdgeIterator{}
 	}
 

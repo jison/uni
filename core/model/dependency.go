@@ -114,14 +114,9 @@ func (d *dependency) Equal(other interface{}) bool {
 	if d.Name() != o.Name() {
 		return false
 	}
-	if d.Tags() != nil {
-		if !d.Tags().Equal(o.Tags()) {
-			return false
-		}
-	} else if o.Tags() != nil {
+	if !d.Tags().Equal(o.Tags()) {
 		return false
 	}
-
 	if d.Optional() != o.Optional() {
 		return false
 	}

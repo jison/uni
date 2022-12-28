@@ -21,6 +21,113 @@ func funcForFuncConsumerTest(a int, b string, c []int, d rune) (*testStructForFu
 	return &testStructForFuncConsumerTest{a, b, c, d}, nil
 }
 
+func Test_funcParam_Format(t *testing.T) {
+	fc := funcConsumerOf(funcForFuncConsumerTest)
+	fp := fc.params[0]
+
+	t.Run("no verbose", func(t *testing.T) {
+		expected := fmt.Sprintf("%+v at parameter `%d`", fp.dependency, fp.index)
+		assert.Equal(t, expected, fmt.Sprintf("%v", fp))
+	})
+
+	t.Run("verbose", func(t *testing.T) {
+		expected := fmt.Sprintf("%+v at parameter `%d` of %+v", fp.dependency, fp.index, fp.Consumer())
+		assert.Equal(t, expected, fmt.Sprintf("%+v", fp))
+	})
+}
+
+func Test_funcParam_clone(t *testing.T) {
+	fc := funcConsumerOf(funcForFuncConsumerTest)
+	fp := fc.params[0]
+
+	t.Run("equality", func(t *testing.T) {
+		fp2 := fp.clone()
+		assert.True(t, fp2.Equal(fp))
+		assert.NotSame(t, fp2, fp)
+	})
+
+	t.Run("update isolation", func(t *testing.T) {
+		fp2 := fp.clone()
+		fp2.index = 2
+		fp2.dependency.optional = true
+
+		assert.Equal(t, 0, fp.index)
+		assert.Equal(t, false, fp.optional)
+	})
+
+	t.Run("nil", func(t *testing.T) {
+		var fp2 *funcParam
+		assert.Nil(t, fp2.clone())
+	})
+}
+
+func Test_funcParam_Equal(t *testing.T) {
+	fc := funcConsumerOf(funcForFuncConsumerTest)
+	fp := fc.params[0]
+
+	t.Run("equal", func(t *testing.T) {
+		fp2 := fp.clone()
+		assert.True(t, fp2.Equal(fp))
+	})
+
+	t.Run("not equal to non funcParam", func(t *testing.T) {
+		assert.False(t, fp.Equal(123))
+	})
+
+	t.Run("nil equal nil", func(t *testing.T) {
+		var fp2 *funcParam
+		var fp3 *funcParam
+		assert.True(t, fp2.Equal(fp3))
+	})
+
+	t.Run("index", func(t *testing.T) {
+		fp2 := fc.params[1]
+		assert.False(t, fp.Equal(fp2))
+	})
+
+	t.Run("dependency", func(t *testing.T) {
+		t.Run("not nil", func(t *testing.T) {
+			fp2 := fp.clone()
+			fp2.optional = true
+			assert.False(t, fp2.Equal(fp))
+		})
+
+		t.Run("nil", func(t *testing.T) {
+			fp2 := fp.clone()
+			fp2.dependency = nil
+			assert.False(t, fp2.Equal(fp))
+			assert.False(t, fp.Equal(fp2))
+
+			fp3 := fp.clone()
+			fp3.dependency = nil
+			assert.True(t, fp3.Equal(fp2))
+		})
+	})
+}
+
+func Test_paramByIndex(t *testing.T) {
+	fc := funcConsumerOf(funcForFuncConsumerTest)
+	fp1 := fc.params[0]
+	fp2 := fc.params[1]
+	fp3 := fc.params[2]
+
+	tests := []struct {
+		name string
+		it   paramByIndex
+		want []Dependency
+	}{
+		{"nil", nil, []Dependency{}},
+		{"0", paramByIndex{}, []Dependency{}},
+		{"1", paramByIndex{0: fp1}, []Dependency{fp1}},
+		{"2", paramByIndex{0: fp1, 1: fp2}, []Dependency{fp1, fp2}},
+		{"n", paramByIndex{0: fp1, 1: fp2, 2: fp3}, []Dependency{fp1, fp2, fp3}},
+	}
+
+	for _, tt := range tests {
+		testDependencyIterator(t, tt.it, tt.want)
+	}
+}
+
 func TestFuncConsumer(t *testing.T) {
 	t.Run("normal function", func(t *testing.T) {
 		tag1 := NewSymbol("tag1")
@@ -177,8 +284,21 @@ func Test_funcConsumer_Consumer(t *testing.T) {
 	})
 
 	t.Run("Location", func(t *testing.T) {
-		con := fc.Consumer()
-		assert.Equal(t, loc1, con.Location())
+		loc2 := location.GetCallLocation(0)
+		fc2 := funcConsumerOf(funcForFuncConsumerTest, Location(loc2))
+		assert.Equal(t, loc2, fc2.Consumer().Location())
+	})
+
+	t.Run("UpdateCallLocation", func(t *testing.T) {
+		baseLoc := location.GetCallLocation(0)
+		var fc2 *funcConsumer
+		func() {
+			fc2 = funcConsumerOf(funcForFuncConsumerTest, UpdateCallLocation())
+		}()
+
+		c := fc2.Consumer()
+		assert.Equal(t, baseLoc.FileName(), c.Location().FileName())
+		assert.Equal(t, baseLoc.FileLine()+4, c.Location().FileLine())
 	})
 
 	t.Run("Validate", func(t *testing.T) {
@@ -536,6 +656,11 @@ func Test_funcConsumer_clone(t *testing.T) {
 
 		verifyConsumer(t, fc3.Consumer())
 	})
+
+	t.Run("nil", func(t *testing.T) {
+		var fc2 *funcConsumer
+		assert.Nil(t, fc2.clone())
+	})
 }
 
 func Test_funcConsumer_Equal(t *testing.T) {
@@ -555,6 +680,16 @@ func Test_funcConsumer_Equal(t *testing.T) {
 		assert.True(t, fc2.Equal(fc))
 	})
 
+	t.Run("not equal to non funcConsumer", func(t *testing.T) {
+		assert.False(t, fc.Equal(123))
+	})
+
+	t.Run("nil equal nil", func(t *testing.T) {
+		var fc2 *funcConsumer
+		var fc3 *funcConsumer
+		assert.True(t, fc2.Equal(fc3))
+	})
+
 	t.Run("function", func(t *testing.T) {
 		fc2 := fc.clone()
 		fc2.funcVal = reflect.ValueOf(func() {})
@@ -562,20 +697,69 @@ func Test_funcConsumer_Equal(t *testing.T) {
 	})
 
 	t.Run("param", func(t *testing.T) {
-		fc2 := fc.clone()
-		fc2.Param(0, ByName("a2"))
-		assert.False(t, fc2.Equal(fc))
+		t.Run("len", func(t *testing.T) {
+			fc2 := fc.clone()
+			fc2.params[4] = &funcParam{}
+			assert.False(t, fc2.Equal(fc))
+		})
+
+		t.Run("parameter does not have same index", func(t *testing.T) {
+			fc2 := fc.clone()
+			fc2.params[4] = fc2.params[3]
+			delete(fc2.params, 3)
+			assert.False(t, fc2.Equal(fc))
+		})
+
+		t.Run("parameter does have same index", func(t *testing.T) {
+			fc2 := fc.clone()
+			fc2.Param(0, ByName("a2"))
+			assert.False(t, fc2.Equal(fc))
+			assert.False(t, fc.Equal(fc2))
+		})
 	})
 
 	t.Run("fakeParam", func(t *testing.T) {
-		fc2 := fc.clone()
-		fc2.Param(4, ByName("4"))
-		assert.False(t, fc2.Equal(fc))
+		t.Run("len", func(t *testing.T) {
+			fc2 := fc.clone()
+			fc2.fakeParams[4] = &funcParam{}
+			assert.False(t, fc2.Equal(fc))
+		})
+
+		t.Run("parameter does not have same index", func(t *testing.T) {
+			fc2 := fc.clone()
+			fc2.fakeParams[4] = &funcParam{}
+			fc3 := fc.clone()
+			fc3.fakeParams[5] = &funcParam{}
+
+			assert.False(t, fc2.Equal(fc3))
+		})
+
+		t.Run("parameter does have same index", func(t *testing.T) {
+			fc2 := fc.clone()
+			fc2.Param(4, ByName("aa"))
+			fc3 := fc.clone()
+			fc3.Param(4, ByName("bb"))
+			assert.False(t, fc2.Equal(fc3))
+			assert.False(t, fc3.Equal(fc2))
+		})
 	})
 
 	t.Run("baseConsumer", func(t *testing.T) {
-		fc2 := fc.clone()
-		fc2.SetLocation(location.GetCallLocation(0))
-		assert.False(t, fc2.Equal(fc))
+		t.Run("not nil", func(t *testing.T) {
+			fc2 := fc.clone()
+			fc2.SetLocation(location.GetCallLocation(0))
+			assert.False(t, fc2.Equal(fc))
+		})
+
+		t.Run("nil", func(t *testing.T) {
+			fc2 := fc.clone()
+			fc2.baseConsumer = nil
+			assert.False(t, fc2.Equal(fc))
+			assert.False(t, fc.Equal(fc2))
+
+			fc3 := fc.clone()
+			fc3.baseConsumer = nil
+			assert.True(t, fc3.Equal(fc2))
+		})
 	})
 }

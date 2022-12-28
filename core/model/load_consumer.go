@@ -40,6 +40,18 @@ func (c *criteriaAsDependency) Validate() error {
 	return nil
 }
 
+func (c *criteriaAsDependency) clone() *criteriaAsDependency {
+	if c == nil {
+		return nil
+	}
+
+	return &criteriaAsDependency{
+		Criteria: c.Criteria,
+		consumer: c.consumer,
+		val:      c.val.Clone(),
+	}
+}
+
 func (c *criteriaAsDependency) Equal(other interface{}) bool {
 	o, ok := other.(*criteriaAsDependency)
 	if !ok {
@@ -53,7 +65,7 @@ func (c *criteriaAsDependency) Equal(other interface{}) bool {
 	if c.Criteria == nil || o.Criteria == nil {
 		return c.Criteria == nil && o.Criteria == nil
 	}
-	if !c.Criteria.Equal(o) {
+	if !c.Criteria.Equal(o.Criteria) {
 		return false
 	}
 
@@ -126,16 +138,17 @@ func (c *loadCriteriaConsumer) Format(f fmt.State, r rune) {
 }
 
 func (c *loadCriteriaConsumer) clone() *loadCriteriaConsumer {
+	if c == nil {
+		return nil
+	}
+
 	cloned := &loadCriteriaConsumer{
 		baseConsumer: c.baseConsumer.clone(),
 	}
 
 	for _, dep := range c.dependencies {
-		clonedDep := &criteriaAsDependency{
-			Criteria: dep.Criteria,
-			consumer: cloned,
-			val:      dep.val.Clone(),
-		}
+		clonedDep := dep.clone()
+		clonedDep.consumer = cloned
 
 		cloned.dependencies = append(cloned.dependencies, clonedDep)
 	}
@@ -149,15 +162,15 @@ func (c *loadCriteriaConsumer) Equal(other interface{}) bool {
 		return false
 	}
 
+	if c == nil || o == nil {
+		return c == nil && o == nil
+	}
+
 	if len(c.dependencies) != len(o.dependencies) {
 		return false
 	}
 
 	for i, d := range c.dependencies {
-		if i > len(o.dependencies)-1 {
-			return false
-		}
-
 		d2 := o.dependencies[i]
 		if !d.Equal(d2) {
 			return false
@@ -238,9 +251,7 @@ func LoadCriteriaConsumer(criteriaList ...CriteriaBuilder) LoadCriteriaConsumerB
 	return loadCriteriaConsumerOf(criteriaList...).UpdateCallLocation(nil)
 }
 
-type wildcard struct{}
-
-var wildcardType = reflect.TypeOf(wildcard{})
+var wildcardType = reflecting.AnyType
 
 func IsWildCardType(t reflect.Type) bool {
 	return t == wildcardType
@@ -268,6 +279,10 @@ func (l *loadAllConsumer) Format(f fmt.State, r rune) {
 }
 
 func (l *loadAllConsumer) clone() *loadAllConsumer {
+	if l == nil {
+		return nil
+	}
+
 	cloned := &loadAllConsumer{
 		baseConsumer: l.baseConsumer.clone(),
 		dep:          l.dep.clone(),
@@ -281,6 +296,10 @@ func (l *loadAllConsumer) Equal(other interface{}) bool {
 	o, ok := other.(*loadAllConsumer)
 	if !ok {
 		return false
+	}
+
+	if l == nil || o == nil {
+		return l == nil && o == nil
 	}
 
 	if l.baseConsumer != nil {
@@ -339,8 +358,9 @@ func loadAllConsumerOf(scope Scope) *loadAllConsumer {
 			val: valuer.Identity(),
 		},
 		dep: &dependency{
-			rType: wildcardType,
-			val:   valuer.Collector(TypeOf((*interface{})(nil))),
+			rType:       reflect.SliceOf(wildcardType),
+			val:         valuer.Identity(),
+			isCollector: true,
 		},
 	}
 	c.dep.consumer = c

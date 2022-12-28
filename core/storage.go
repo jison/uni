@@ -37,7 +37,7 @@ func (s *scopeStorage) Get(node Node, scope model.Scope) (valuer.Value, bool) {
 	if s.scope == scope {
 		value, ok := s.valueByNode.Load(node)
 		if ok {
-			return value.(valuer.Value), ok
+			return value.(valuer.Value), true
 		} else {
 			return nil, false
 		}

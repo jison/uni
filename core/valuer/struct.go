@@ -35,16 +35,18 @@ func (v *structValuer) Value(inputs []Value) Value {
 			continue
 		}
 
-		if field, ok := rVal.Interface().(structField); ok {
-			if _, exist := fields[field.name]; exist {
-				errs = errs.AddErrors(errors.Bugf("duplicate field %v of struct element", field.name))
-				continue
-			}
-
-			fields[field.name] = field.val
-		} else {
+		field, ok := rVal.Interface().(structField)
+		if !ok {
 			errs = errs.AddErrors(errors.Bugf("input of struct should be structField"))
+			continue
 		}
+
+		if _, exist := fields[field.name]; exist {
+			errs = errs.AddErrors(errors.Bugf("duplicate field %v of struct element", field.name))
+			continue
+		}
+
+		fields[field.name] = field.val
 	}
 	if errs.HasError() {
 		return ErrorValue(errs)

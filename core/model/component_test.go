@@ -59,6 +59,10 @@ func Test_component_attributes(t *testing.T) {
 			assert.True(t, com.Equal(com2))
 		})
 
+		t.Run("non component", func(t *testing.T) {
+			assert.False(t, com.Equal(123))
+		})
+
 		t.Run("ignored", func(t *testing.T) {
 			com2 := com.clone()
 			com2.ignored = false
@@ -97,9 +101,22 @@ func Test_component_attributes(t *testing.T) {
 		})
 
 		t.Run("valuer", func(t *testing.T) {
-			com2 := com.clone()
-			com2.val = valuer.Index(2)
-			assert.False(t, com.Equal(com2))
+			t.Run("not nil", func(t *testing.T) {
+				com2 := com.clone()
+				com2.val = valuer.Index(2)
+				assert.False(t, com.Equal(com2))
+			})
+
+			t.Run("nil", func(t *testing.T) {
+				com2 := com.clone()
+				com2.val = nil
+				assert.False(t, com2.Equal(com))
+				assert.False(t, com.Equal(com2))
+
+				com3 := com.clone()
+				com3.val = nil
+				assert.True(t, com2.Equal(com3))
+			})
 		})
 	})
 }
@@ -149,6 +166,11 @@ func Test_component_builder(t *testing.T) {
 		com.AddTags(tag2)
 		assert.True(t, com.Tags().Has(tag2))
 	})
+
+	t.Run("Component", func(t *testing.T) {
+		com2 := com.Component()
+		assert.True(t, com2.Equal(com))
+	})
 }
 
 func Test_component_options(t *testing.T) {
@@ -192,6 +214,7 @@ func Test_component_options(t *testing.T) {
 		assert.True(t, com.Tags().Has(tag1))
 		Tags(tag2).ApplyComponent(com)
 		assert.True(t, com.Tags().Has(tag2))
+		Tags().ApplyComponent(com)
 	})
 }
 
@@ -465,6 +488,11 @@ func Test_component_clone(t *testing.T) {
 		com.AddTags(tag2)
 
 		verifyComponent(t, com3)
+	})
+
+	t.Run("nil", func(t *testing.T) {
+		var com2 *component
+		assert.Nil(t, com2.clone())
 	})
 }
 

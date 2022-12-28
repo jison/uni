@@ -149,10 +149,7 @@ func TestAttrs_Iterate(t *testing.T) {
 			assert.False(t, allAttr.Has(key))
 			allAttr[key] = value
 			assert.True(t, allAttr.Has(key))
-			if allAttr.Len() >= 2 {
-				return false
-			}
-			return true
+			return allAttr.Len() < 2
 		})
 		assert.Equal(t, 2, allAttr.Len())
 	})
@@ -212,7 +209,7 @@ func TestAttrs_Del(t *testing.T) {
 func TestAttrsFrom(t *testing.T) {
 	tests := []struct {
 		name string
-		a    Attrs
+		a    AttrsView
 		want Attrs
 	}{
 		{"attrs is nil", nil, Attrs{}},

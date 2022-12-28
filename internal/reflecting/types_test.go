@@ -9,15 +9,29 @@ import (
 )
 
 func TestIsErrorType(t *testing.T) {
-	err := errors.Newf("abc")
-	assert.True(t, IsErrorType(reflect.TypeOf(err)))
+	t.Run("error", func(t *testing.T) {
+		err := errors.Newf("abc")
+		assert.True(t, IsErrorType(reflect.TypeOf(err)))
+	})
 
-	assert.False(t, IsErrorType(reflect.TypeOf(1)))
+	t.Run("no error", func(t *testing.T) {
+		assert.False(t, IsErrorType(reflect.TypeOf(1)))
+	})
+
+	t.Run("nil", func(t *testing.T) {
+		assert.False(t, IsErrorType(nil))
+	})
 }
 
 func TestIsErrorValue(t *testing.T) {
-	err := errors.Newf("abc")
-	assert.True(t, IsErrorValue(reflect.ValueOf(err)))
+	t.Run("error", func(t *testing.T) {
+		err := errors.Newf("abc")
+		assert.True(t, IsErrorValue(reflect.ValueOf(err)))
+	})
+
+	t.Run("invalid value", func(t *testing.T) {
+		assert.False(t, IsErrorValue(reflect.ValueOf(nil)))
+	})
 }
 
 func TestAsError(t *testing.T) {
@@ -37,13 +51,58 @@ func TestAsError(t *testing.T) {
 		_, ok := AsError(reflect.ValueOf(nil))
 		assert.False(t, ok)
 	})
+
+	type testStruct struct {
+		a error
+	}
+
+	t.Run("CanInterface() is false", func(t *testing.T) {
+		ts := testStruct{a: errors.Newf("this is an error")}
+		val := reflect.ValueOf(ts).Field(0)
+		_, ok := AsError(val)
+		assert.False(t, ok)
+	})
 }
 
 func TestIsNilValue(t *testing.T) {
-	val := reflect.ValueOf(nil)
-	assert.True(t, IsNilValue(val))
+	var intPtr *int
+	var intChan chan int
+	var m map[int]string
+	var slice []int
+	var f func()
+	var iface interface{}
 
-	assert.False(t, IsNilValue(reflect.ValueOf(123)))
+	type args struct {
+		val interface{}
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{"nil", args{nil}, true},
+		{"int", args{1}, false},
+		{"nil ptr", args{intPtr}, true},
+		{"ptr", args{&args{}}, false},
+		{"nil intChan", args{intChan}, true},
+		{"intChan", args{make(chan int)}, false},
+		{"nil map", args{m}, true},
+		{"map", args{map[interface{}]interface{}{1: 1}}, false},
+		{"string", args{"a"}, false},
+		{"empty array", args{[0]int{}}, false},
+		{"array", args{[1]int{1}}, false},
+		{"nil slice", args{slice}, true},
+		{"slice", args{[]int{1}}, false},
+		{"nil func", args{f}, true},
+		{"func", args{func() {}}, false},
+		{"interface{}", args{iface}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, IsNilValue(reflect.ValueOf(tt.args.val)))
+		})
+	}
+
 }
 
 func TestReflectValueOfArray(t *testing.T) {
@@ -66,6 +125,9 @@ func TestReflectValueOfArray(t *testing.T) {
 func TestIsKindOrPtrOfKind(t *testing.T) {
 	str := ""
 	strPtr := &str
+	var nilStrPtr *string
+
+	assert.True(t, IsKindOrPtrOfKind(reflect.TypeOf(nilStrPtr), reflect.String))
 
 	assert.True(t, IsKindOrPtrOfKind(reflect.TypeOf(str), reflect.String))
 	assert.True(t, IsKindOrPtrOfKind(reflect.TypeOf(strPtr), reflect.String))
@@ -75,6 +137,8 @@ func TestIsKindOrPtrOfKind(t *testing.T) {
 
 	assert.False(t, IsKindOrPtrOfKind(reflect.TypeOf(str), reflect.Int))
 	assert.False(t, IsKindOrPtrOfKind(reflect.TypeOf(strPtr), reflect.Int))
+
+	assert.False(t, IsKindOrPtrOfKind(nil, reflect.Interface))
 }
 
 func TestCanBeMapKey(t *testing.T) {

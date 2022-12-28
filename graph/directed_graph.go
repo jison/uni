@@ -82,13 +82,13 @@ func (g *digraph) RemoveNode(node Node) {
 	for pre := range g.predecessors[node] {
 		delete(g.successors[pre], node)
 	}
-	delete(g.successors, node)
 
 	for suc := range g.successors[node] {
 		delete(g.predecessors[suc], node)
 	}
-	delete(g.predecessors, node)
 
+	delete(g.successors, node)
+	delete(g.predecessors, node)
 	delete(g.nodes, node)
 }
 

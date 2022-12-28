@@ -129,11 +129,7 @@ func (c *component) Equal(other interface{}) bool {
 	if c.Type() != o.Type() {
 		return false
 	}
-	if c.As() != nil {
-		if !c.As().Equal(o.As()) {
-			return false
-		}
-	} else if o.As() != nil {
+	if !c.As().Equal(o.As()) {
 		return false
 	}
 
@@ -141,11 +137,7 @@ func (c *component) Equal(other interface{}) bool {
 		return false
 	}
 
-	if c.Tags() != nil {
-		if !c.Tags().Equal(o.Tags()) {
-			return false
-		}
-	} else if o.As() != nil {
+	if !c.Tags().Equal(o.Tags()) {
 		return false
 	}
 

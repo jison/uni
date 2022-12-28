@@ -88,9 +88,6 @@ func ValueOfCtx(ctx context.Context, t model.TypeVal, opts ...model.ValueConsume
 
 func EnterScopeCtx(ctx context.Context, scope model.Scope) (context.Context, error) {
 	c := ContainerOfCtx(ctx)
-	if c == nil {
-		return nil, errors.Newf("container is nil")
-	}
 	c2, err := EnterScope(c, scope)
 	if err != nil {
 		return nil, err
@@ -101,7 +98,7 @@ func EnterScopeCtx(ctx context.Context, scope model.Scope) (context.Context, err
 func LeaveScopeCtx(ctx context.Context) context.Context {
 	c := ContainerOfCtx(ctx)
 	if c == nil {
-		return nil
+		return ctx
 	}
 	c2 := LeaveScope(c)
 	return WithContainerCtx(ctx, c2)

@@ -47,9 +47,11 @@ func (fp *funcProvider) Validate() error {
 		var structErr errors.StructError
 		if errors.As(err, &structErr) {
 			errs = structErr
-		} else {
-			errs = errs.AddErrors(err)
 		}
+		// it must be StructError
+		//else {
+		//	errs = errs.AddErrors(err)
+		//}
 	}
 
 	for index := range fp.fakeComponents {
@@ -85,6 +87,10 @@ func (fp *funcProvider) Format(f fmt.State, r rune) {
 }
 
 func (fp *funcProvider) clone() *funcProvider {
+	if fp == nil {
+		return nil
+	}
+
 	newFP := &funcProvider{
 		funcConsumer:   fp.funcConsumer.clone(),
 		baseProvider:   fp.baseProvider,
@@ -117,6 +123,9 @@ func (fp *funcProvider) Equal(other interface{}) bool {
 	o, ok := other.(*funcProvider)
 	if !ok {
 		return false
+	}
+	if fp == nil || o == nil {
+		return fp == nil && o == nil
 	}
 
 	if fp.funcConsumer != nil {

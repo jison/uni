@@ -2,6 +2,8 @@ package core
 
 import (
 	"fmt"
+	"github.com/jison/uni/core/valuer"
+	"github.com/jison/uni/graph"
 	"strings"
 	"testing"
 
@@ -207,13 +209,13 @@ func Test_dependenceCycleNode(t *testing.T) {
 
 		t.Run("not verbose", func(t *testing.T) {
 			expected := strings.Builder{}
-			expected.WriteString("cycle:\n")
-			expected.WriteString(fmt.Sprintf("\t%v\n", com1))
-			expected.WriteString(fmt.Sprintf("\t%v\n", dep2))
-			expected.WriteString(fmt.Sprintf("\t%+v\n", com2.Provider()))
-			expected.WriteString(fmt.Sprintf("\t%v\n", com2))
-			expected.WriteString(fmt.Sprintf("\t%v\n", dep1))
-			expected.WriteString(fmt.Sprintf("\t%+v\n", com1.Provider()))
+			expected.WriteString("cycle:")
+			expected.WriteString(fmt.Sprintf("\n\t%v", com1))
+			expected.WriteString(fmt.Sprintf("\n\t%v", dep2))
+			expected.WriteString(fmt.Sprintf("\n\t%+v", com2.Provider()))
+			expected.WriteString(fmt.Sprintf("\n\t%v", com2))
+			expected.WriteString(fmt.Sprintf("\n\t%v", dep1))
+			expected.WriteString(fmt.Sprintf("\n\t%+v", com1.Provider()))
 
 			str := fmt.Sprintf("%v", cycle)
 			assert.Equal(t, expected.String(), str)
@@ -221,16 +223,45 @@ func Test_dependenceCycleNode(t *testing.T) {
 
 		t.Run("verbose", func(t *testing.T) {
 			expected := strings.Builder{}
-			expected.WriteString("cycle:\n")
-			expected.WriteString(fmt.Sprintf("\t%v\n", com1))
-			expected.WriteString(fmt.Sprintf("\t%v\n", dep2))
-			expected.WriteString(fmt.Sprintf("\t%+v\n", com2.Provider()))
-			expected.WriteString(fmt.Sprintf("\t%v\n", com2))
-			expected.WriteString(fmt.Sprintf("\t%v\n", dep1))
-			expected.WriteString(fmt.Sprintf("\t%+v\n", com1.Provider()))
+			expected.WriteString("cycle:")
+			expected.WriteString(fmt.Sprintf("\n\t%v", com1))
+			expected.WriteString(fmt.Sprintf("\n\t%v", dep2))
+			expected.WriteString(fmt.Sprintf("\n\t%+v", com2.Provider()))
+			expected.WriteString(fmt.Sprintf("\n\t%v", com2))
+			expected.WriteString(fmt.Sprintf("\n\t%v", dep1))
+			expected.WriteString(fmt.Sprintf("\n\t%+v", com1.Provider()))
 
 			str := fmt.Sprintf("%+v", cycle)
 			assert.Equal(t, expected.String(), str)
 		})
+	})
+}
+
+func Test_dependenceCycleFromGCycle(t *testing.T) {
+	dg := newDependenceGraphForTest(model.EmptyComponents())
+
+	t.Run("cycle is empty", func(t *testing.T) {
+		r := dependenceCycleFromGCycle(dg, []graph.Node{})
+		assert.Nil(t, r)
+	})
+
+	t.Run("node in cycle in are not valuer", func(t *testing.T) {
+		r := dependenceCycleFromGCycle(dg, []graph.Node{1, 2, 3})
+		assert.Nil(t, r)
+	})
+
+	t.Run("normal cycle", func(t *testing.T) {
+		node1 := valuer.Identity()
+		node2 := valuer.Identity()
+
+		nodes := []graph.Node{node1, 123, node2}
+		r := dependenceCycleFromGCycle(dg, nodes)
+		pairs := pairsOfCycle(r)
+
+		pairs2 := map[[2]Node]struct{}{
+			{node1, node2}: {},
+			{node2, node1}: {},
+		}
+		assert.Equal(t, pairs, pairs2)
 	})
 }

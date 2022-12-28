@@ -73,6 +73,10 @@ func Test_dependency_attributes(t *testing.T) {
 			assert.True(t, d2.Equal(d))
 		})
 
+		t.Run("not equal to non dependency", func(t *testing.T) {
+			assert.False(t, d.Equal(123))
+		})
+
 		t.Run("type", func(t *testing.T) {
 			d2 := d.clone()
 			d2.rType = reflect.TypeOf("")
@@ -106,9 +110,22 @@ func Test_dependency_attributes(t *testing.T) {
 		})
 
 		t.Run("valuer", func(t *testing.T) {
-			d2 := d.clone()
-			d2.val = valuer.Index(1)
-			assert.False(t, d2.Equal(d))
+			t.Run("not nil", func(t *testing.T) {
+				d2 := d.clone()
+				d2.val = valuer.Index(1)
+				assert.False(t, d2.Equal(d))
+			})
+
+			t.Run("not nil", func(t *testing.T) {
+				d2 := d.clone()
+				d2.val = nil
+				assert.False(t, d2.Equal(d))
+				assert.False(t, d.Equal(d2))
+
+				d3 := d.clone()
+				d3.val = nil
+				assert.True(t, d3.Equal(d2))
+			})
 		})
 	})
 }
@@ -308,6 +325,11 @@ func Test_dependency_clone(t *testing.T) {
 		d1.val = val2
 
 		verifyDependency(t, d2)
+	})
+
+	t.Run("nil", func(t *testing.T) {
+		var d2 *dependency
+		assert.Nil(t, d2.clone())
 	})
 }
 

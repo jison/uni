@@ -4,7 +4,6 @@ import (
 	"github.com/jison/uni/core/model"
 	"github.com/jison/uni/core/valuer"
 	"github.com/jison/uni/internal/errors"
-	"github.com/jison/uni/internal/reflecting"
 )
 
 type Executor interface {
@@ -20,24 +19,7 @@ type executor struct {
 
 func (e *executor) Execute() (interface{}, error) {
 	val := e.getValueOfNode(e.node, e.storage, NewPath(e.graph))
-
-	if err, ok := val.AsError(); ok {
-		return nil, err
-	}
-
-	if rVal, ok := val.AsSingle(); ok {
-		if !rVal.CanInterface() {
-			return nil, errors.Newf("%v can not call Interface()", val)
-		} else {
-			return rVal.Interface(), nil
-		}
-	}
-
-	if arr, ok := val.AsArray(); ok {
-		return reflecting.ArrayOfReflectValues(arr)
-	}
-
-	return nil, errors.Bugf("can not reach here")
+	return val.Interface()
 }
 
 func (e *executor) getValueOfNode(node Node, storage ScopeBaseStorage, stack Path) valuer.Value {

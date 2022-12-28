@@ -56,27 +56,30 @@ func (v *funcValuer) params(inputs []Value) ([]reflect.Value, error) {
 			errs = errs.AddErrorf("%+v .CanInterface() is false", inVal)
 			continue
 		}
-		if param, ok := rVal.Interface().(funcParam); ok {
-			if param.index < 0 || param.index >= len(params) {
-				err := errors.Bugf("index %v is out of range. [0, %v]", param.index, len(params)-1)
-				errs = errs.AddErrors(err)
-				continue
-			}
-			if params[param.index].IsValid() {
-				errs = errs.AddErrors(errors.Bugf("duplicate index %v of param element", param.index))
-				continue
-			}
 
-			if !param.val.Type().AssignableTo(funcType.In(param.index)) {
-				err := errors.Bugf("%v (%v) is not assignable to param %d of %v",
-					param.val, param.val.Type(), param.index, funcType)
-				errs = errs.AddErrors(err)
-				continue
-			}
-			params[param.index] = param.val
-		} else {
+		param, ok := rVal.Interface().(funcParam)
+		if !ok {
 			errs = errs.AddErrors(errors.Bugf("input of func should be funcParam"))
+			continue
 		}
+
+		if param.index < 0 || param.index >= len(params) {
+			err := errors.Bugf("index %v is out of range. [0, %v]", param.index, len(params)-1)
+			errs = errs.AddErrors(err)
+			continue
+		}
+		if params[param.index].IsValid() {
+			errs = errs.AddErrors(errors.Bugf("duplicate index %v of param element", param.index))
+			continue
+		}
+
+		if !param.val.Type().AssignableTo(funcType.In(param.index)) {
+			err := errors.Bugf("%v (%v) is not assignable to param %d of %v",
+				param.val, param.val.Type(), param.index, funcType)
+			errs = errs.AddErrors(err)
+			continue
+		}
+		params[param.index] = param.val
 	}
 
 	if errs.HasError() {

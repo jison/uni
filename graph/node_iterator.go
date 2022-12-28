@@ -1,6 +1,8 @@
 package graph
 
-import "github.com/jison/uni/internal/reflecting"
+import (
+	"github.com/jison/uni/internal/reflecting"
+)
 
 type Node interface{}
 
@@ -41,6 +43,7 @@ func NodesWithAttrsFrom(ni NodeAndAttrsIterator) NodesWithAttrs {
 	if ni == nil {
 		return nodes
 	}
+
 	ni.Iterate(func(node Node, attrs AttrsView) bool {
 		var nodeAttrs Attrs
 		var ok bool

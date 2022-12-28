@@ -575,7 +575,7 @@ func Test_digraph_RemoveEdge(t *testing.T) {
 
 	t.Run("remove existing edge", func(t *testing.T) {
 		g := NewDirectedGraph()
-		AddEdge(g, 1, 2)
+		AddEdges(g, [][2]Node{{1, 2}})
 		assert.True(t, HasEdge(g, 1, 2))
 		g.RemoveEdge(1, 2)
 		assert.False(t, HasEdge(g, 1, 2))
@@ -618,8 +618,7 @@ func Test_digraph_RemoveNode(t *testing.T) {
 
 	t.Run("after add edge", func(t *testing.T) {
 		g := NewDirectedGraph()
-		AddEdge(g, 1, 2)
-		AddEdge(g, 2, 3)
+		AddEdges(g, [][2]Node{{1, 2}, {2, 3}})
 		g.RemoveNode(2)
 		assert.True(t, HasNode(g, 1))
 		assert.True(t, HasNode(g, 3))

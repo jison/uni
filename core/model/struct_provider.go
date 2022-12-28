@@ -36,9 +36,11 @@ func (sp *structProvider) Validate() error {
 		var structErr errors.StructError
 		if errors.As(err, &structErr) {
 			errs = structErr
-		} else {
-			errs = errs.AddErrors(err)
 		}
+		// it must be StructError
+		//else {
+		//	errs = errs.AddErrors(err)
+		//}
 	}
 
 	if err := sp.com.Validate(); err != nil {
@@ -61,6 +63,9 @@ func (sp *structProvider) Format(f fmt.State, r rune) {
 }
 
 func (sp *structProvider) clone() *structProvider {
+	if sp == nil {
+		return nil
+	}
 	cloned := &structProvider{
 		baseProvider:   sp.baseProvider,
 		structConsumer: sp.structConsumer.clone(),
@@ -81,6 +86,9 @@ func (sp *structProvider) Equal(other interface{}) bool {
 	o, ok := other.(*structProvider)
 	if !ok {
 		return false
+	}
+	if sp == nil || o == nil {
+		return sp == nil && o == nil
 	}
 
 	if sp.structConsumer != nil {

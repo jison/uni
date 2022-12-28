@@ -64,6 +64,18 @@ func TestInitStructWithReflectValues(t *testing.T) {
 		assert.Equal(t, val.Interface(), testStructWithUnexportedField{Field1: "a", field2: "b", _field3: "c"})
 	})
 
+	t.Run("struct with can not Interface() value", func(t *testing.T) {
+		ts := testStructWithUnexportedField{field2: "abc"}
+		tsVal := reflect.ValueOf(ts)
+
+		structType := reflect.TypeOf(testStruct{})
+		values := map[string]reflect.Value{
+			"Field1": tsVal.FieldByName("field2"),
+		}
+		_, err := InitStructWithReflectValues(structType, values)
+		assert.NotNil(t, err)
+	})
+
 	t.Run("init pointer of struct", func(t *testing.T) {
 		structPtrType := reflect.TypeOf(&testStruct{})
 		values := map[string]reflect.Value{
@@ -88,7 +100,6 @@ func TestInitStructWithReflectValues(t *testing.T) {
 		assert.Equal(t, val.Kind(), reflect.Ptr)
 		assert.Equal(t, val.Interface(), &testStructWithUnexportedField{Field1: "a", field2: "b", _field3: "c"})
 	})
-
 }
 
 func TestUpdateStructValues(t *testing.T) {

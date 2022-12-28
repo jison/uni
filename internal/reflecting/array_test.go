@@ -9,10 +9,25 @@ import (
 )
 
 func TestArrayOfReflectValues(t *testing.T) {
-	rVals := []reflect.Value{reflect.ValueOf(1), reflect.ValueOf("a")}
-	vals, err := ArrayOfReflectValues(rVals)
-	assert.Nil(t, err)
-	assert.Equal(t, []interface{}{1, "a"}, vals)
+	t.Run("array", func(t *testing.T) {
+		rVals := []reflect.Value{reflect.ValueOf(1), reflect.ValueOf("a")}
+		vals, err := ArrayOfReflectValues(rVals)
+		assert.Nil(t, err)
+		assert.Equal(t, []interface{}{1, "a"}, vals)
+	})
+
+	t.Run("CanInterface() is false", func(t *testing.T) {
+		type testStruct struct {
+			a int
+		}
+
+		ts := testStruct{a: 123}
+		tsVal := reflect.ValueOf(ts)
+
+		rVals := []reflect.Value{reflect.ValueOf(1), tsVal.Field(0)}
+		_, err := ArrayOfReflectValues(rVals)
+		assert.NotNil(t, err)
+	})
 }
 
 func TestReflectValuesOf(t *testing.T) {

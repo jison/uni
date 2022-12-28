@@ -48,6 +48,10 @@ func (c *baseConsumer) SetLocation(loc location.Location) {
 }
 
 func (c *baseConsumer) clone() *baseConsumer {
+	if c == nil {
+		return nil
+	}
+
 	var val2 valuer.Valuer
 	if c.val != nil {
 		val2 = c.val.Clone()

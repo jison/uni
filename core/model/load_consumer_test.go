@@ -2,12 +2,168 @@ package model
 
 import (
 	"fmt"
+	"github.com/jison/uni/internal/errors"
 	"testing"
 
 	"github.com/jison/uni/core/valuer"
 	"github.com/jison/uni/internal/location"
 	"github.com/stretchr/testify/assert"
 )
+
+func Test_criteriaAsDependency(t *testing.T) {
+	lc := loadCriteriaConsumerOf(NewCriteria(0))
+	cd := lc.dependencies[0]
+
+	t.Run("Consumer", func(t *testing.T) {
+		assert.Same(t, cd.consumer, cd.Consumer())
+	})
+
+	t.Run("Optional", func(t *testing.T) {
+		assert.False(t, cd.Optional())
+	})
+
+	t.Run("IsCollector", func(t *testing.T) {
+		assert.False(t, cd.IsCollector())
+	})
+
+	t.Run("Valuer", func(t *testing.T) {
+		assert.True(t, cd.Valuer().Equal(valuer.Identity()))
+	})
+
+	t.Run("Validate", func(t *testing.T) {
+		t.Run("no error", func(t *testing.T) {
+			err := cd.Validate()
+			assert.Nil(t, err)
+		})
+
+		t.Run("type of criteria is error", func(t *testing.T) {
+			lc2 := loadCriteriaConsumerOf(NewCriteria(errors.Newf("this is error")))
+			cd2 := lc2.dependencies[0]
+			err := cd2.Validate()
+			assert.NotNil(t, err)
+		})
+	})
+
+	t.Run("clone", func(t *testing.T) {
+		t.Run("equality", func(t *testing.T) {
+			cd2 := cd.clone()
+			assert.True(t, cd2.Equal(cd))
+			assert.NotSame(t, cd2, cd)
+		})
+
+		t.Run("update isolation", func(t *testing.T) {
+			cd3 := cd.clone()
+
+			cd2 := cd.clone()
+			cd2.Criteria = nil
+			cd2.consumer = nil
+			cd2.val = nil
+
+			assert.Equal(t, cd.Criteria, cd3.Criteria)
+			assert.Equal(t, cd.consumer, cd3.consumer)
+			assert.Equal(t, cd.val, cd3.val)
+		})
+
+		t.Run("nil", func(t *testing.T) {
+			var cd2 *criteriaAsDependency
+			assert.Nil(t, cd2.clone())
+		})
+	})
+
+	t.Run("Equal", func(t *testing.T) {
+		t.Run("equal", func(t *testing.T) {
+			cd2 := cd.clone()
+			assert.True(t, cd2.Equal(cd))
+		})
+
+		t.Run("not equal to non criteriaAsDependency", func(t *testing.T) {
+			assert.False(t, cd.Equal(123))
+		})
+
+		t.Run("nil", func(t *testing.T) {
+			var cd1 *criteriaAsDependency
+			var cd2 *criteriaAsDependency
+			assert.True(t, cd1.Equal(cd2))
+			assert.False(t, cd.Equal(cd1))
+			assert.False(t, cd2.Equal(cd))
+		})
+
+		t.Run("Criteria", func(t *testing.T) {
+			t.Run("nil", func(t *testing.T) {
+				cd2 := cd.clone()
+				cd2.Criteria = nil
+				assert.False(t, cd2.Equal(cd))
+				assert.False(t, cd.Equal(cd2))
+
+				cd3 := cd.clone()
+				cd3.Criteria = nil
+				assert.True(t, cd2.Equal(cd3))
+			})
+
+			t.Run("not nil", func(t *testing.T) {
+				cd2 := cd.clone()
+				cd2.Criteria = NewCriteria(TypeOf("a")).Criteria()
+				assert.False(t, cd2.Equal(cd))
+			})
+		})
+
+		t.Run("val", func(t *testing.T) {
+			t.Run("nil", func(t *testing.T) {
+				cd2 := cd.clone()
+				cd2.val = nil
+				assert.False(t, cd2.Equal(cd))
+				assert.False(t, cd.Equal(cd2))
+
+				cd3 := cd.clone()
+				cd3.val = nil
+				assert.True(t, cd2.Equal(cd3))
+			})
+
+			t.Run("not nil", func(t *testing.T) {
+				cd2 := cd.clone()
+				cd2.val = valuer.OneOf()
+				assert.False(t, cd2.Equal(cd))
+			})
+		})
+	})
+
+	t.Run("Format", func(t *testing.T) {
+		t.Run("no verbose", func(t *testing.T) {
+			expected := fmt.Sprintf("%v", cd.Criteria)
+			assert.Equal(t, expected, fmt.Sprintf("%v", cd))
+		})
+
+		t.Run("verbose", func(t *testing.T) {
+			expected := fmt.Sprintf("%+v", cd.Criteria)
+			assert.Equal(t, expected, fmt.Sprintf("%+v", cd))
+		})
+	})
+}
+
+func Test_criteriaAsDepList(t *testing.T) {
+	lc := loadCriteriaConsumerOf(NewCriteria(0), NewCriteria(""), NewCriteria('a'))
+	cd1 := lc.dependencies[0]
+	cd2 := lc.dependencies[1]
+	cd3 := lc.dependencies[2]
+
+	tests := []struct {
+		name string
+		list criteriaAsDepList
+		want []Dependency
+	}{
+		{"nil", nil, []Dependency{}},
+		{"0", []*criteriaAsDependency{}, []Dependency{}},
+		{"1", []*criteriaAsDependency{cd1}, []Dependency{cd1}},
+		{"2", []*criteriaAsDependency{cd1, cd2}, []Dependency{cd1, cd2}},
+		{"n", []*criteriaAsDependency{cd1, cd2, cd3}, []Dependency{cd1, cd2, cd3}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testDependencyIterator(t, tt.list, tt.want)
+		})
+	}
+}
 
 func TestLoadCriteriaConsumer(t *testing.T) {
 	tag1 := NewSymbol("tag1")
@@ -353,6 +509,69 @@ func Test_loadCriteriaConsumer_clone(t *testing.T) {
 
 		verifyConsumer(t, lc3.Consumer())
 	})
+
+	t.Run("nil", func(t *testing.T) {
+		var lc2 *loadCriteriaConsumer
+		assert.Nil(t, lc2.clone())
+	})
+}
+
+func Test_loadCriteriaConsumer_Equal(t *testing.T) {
+	lc := loadCriteriaConsumerOf(
+		NewCriteria(TypeOf(1), ByName("c1")),
+		NewCriteria(TypeOf(""), ByName("c2")),
+		NewCriteria(TypeOf([]int{})).SetName("c3"),
+	)
+
+	t.Run("equal", func(t *testing.T) {
+		lc2 := lc.clone()
+		assert.True(t, lc.Equal(lc2))
+	})
+
+	t.Run("not equal to non loadCriteriaConsumer", func(t *testing.T) {
+		assert.False(t, lc.Equal(123))
+	})
+
+	t.Run("nil equal nil", func(t *testing.T) {
+		var lc2 *loadCriteriaConsumer
+		var lc3 *loadCriteriaConsumer
+		assert.True(t, lc2.Equal(lc3))
+	})
+
+	t.Run("dependencies", func(t *testing.T) {
+		t.Run("len", func(t *testing.T) {
+			lc2 := loadCriteriaConsumerOf(
+				NewCriteria(TypeOf(1), ByName("c1")),
+			)
+			assert.False(t, lc.Equal(lc2))
+		})
+
+		t.Run("dependency", func(t *testing.T) {
+			lc2 := loadCriteriaConsumerOf(
+				NewCriteria(TypeOf(1), ByName("c1")),
+				NewCriteria(TypeOf(""), ByName("c2")),
+				NewCriteria(TypeOf([]int{})).SetName("c4"),
+			)
+			assert.False(t, lc.Equal(lc2))
+		})
+	})
+
+	t.Run("baseConsumer", func(t *testing.T) {
+		t.Run("nil", func(t *testing.T) {
+			lc2 := lc.clone()
+			lc2.baseConsumer = nil
+			assert.False(t, lc2.Equal(lc))
+			assert.False(t, lc.Equal(lc2))
+
+			lc3 := lc.clone()
+			lc3.baseConsumer = nil
+			assert.True(t, lc3.Equal(lc2))
+		})
+
+		t.Run("not nil", func(t *testing.T) {
+
+		})
+	})
 }
 
 func TestLoadAllConsumer(t *testing.T) {
@@ -369,9 +588,9 @@ func TestLoadAllConsumer(t *testing.T) {
 	assert.Equal(t, wildcardType, dep.Type())
 	assert.Equal(t, "", dep.Name())
 	assert.Equal(t, (*symbolSet)(nil), dep.Tags())
-	assert.Equal(t, valuer.Collector(TypeOf((*interface{})(nil))), dep.Valuer())
+	assert.Equal(t, valuer.Identity(), dep.Valuer())
 	assert.False(t, dep.Optional())
-	assert.False(t, dep.IsCollector())
+	assert.True(t, dep.IsCollector())
 	assert.Same(t, con, dep.Consumer())
 
 	assert.Equal(t, valuer.Identity(), con.Valuer())
@@ -392,9 +611,9 @@ func Test_loadAllConsumer_Consumer(t *testing.T) {
 		assert.Equal(t, wildcardType, dep.Type())
 		assert.Equal(t, "", dep.Name())
 		assert.Equal(t, (*symbolSet)(nil), dep.Tags())
-		assert.Equal(t, valuer.Collector(TypeOf((*interface{})(nil))), dep.Valuer())
+		assert.Equal(t, valuer.Identity(), dep.Valuer())
 		assert.False(t, dep.Optional())
-		assert.False(t, dep.IsCollector())
+		assert.True(t, dep.IsCollector())
 		assert.Same(t, con, dep.Consumer())
 	})
 
@@ -418,7 +637,7 @@ func Test_loadAllConsumer_Consumer(t *testing.T) {
 
 	t.Run("Format", func(t *testing.T) {
 		t.Run("not verbose", func(t *testing.T) {
-			expected := fmt.Sprintf("LoadAll")
+			expected := "LoadAll"
 			assert.Equal(t, expected, fmt.Sprintf("%v", con))
 		})
 
@@ -489,9 +708,9 @@ func Test_loadAllConsumer_LoadAllConsumerBuilder(t *testing.T) {
 		assert.Equal(t, wildcardType, dep.Type())
 		assert.Equal(t, "", dep.Name())
 		assert.Equal(t, (*symbolSet)(nil), dep.Tags())
-		assert.Equal(t, valuer.Collector(TypeOf((*interface{})(nil))), dep.Valuer())
+		assert.Equal(t, valuer.Identity(), dep.Valuer())
 		assert.False(t, dep.Optional())
-		assert.False(t, dep.IsCollector())
+		assert.True(t, dep.IsCollector())
 		assert.Same(t, con, dep.Consumer())
 
 		assert.Equal(t, valuer.Identity(), con.Valuer())
@@ -516,9 +735,9 @@ func Test_loadAllConsumer_clone(t *testing.T) {
 		assert.Equal(t, wildcardType, dep.Type())
 		assert.Equal(t, "", dep.Name())
 		assert.Equal(t, (*symbolSet)(nil), dep.Tags())
-		assert.Equal(t, valuer.Collector(TypeOf((*interface{})(nil))), dep.Valuer())
+		assert.Equal(t, valuer.Identity(), dep.Valuer())
 		assert.False(t, dep.Optional())
-		assert.False(t, dep.IsCollector())
+		assert.True(t, dep.IsCollector())
 		assert.Same(t, con, dep.Consumer())
 
 		assert.Equal(t, valuer.Identity(), con.Valuer())
@@ -553,5 +772,51 @@ func Test_loadAllConsumer_clone(t *testing.T) {
 		lc2.SetScope(scope2)
 
 		verifyConsumer(t, lc3.Consumer())
+	})
+
+	t.Run("nil", func(t *testing.T) {
+		var lc2 *loadAllConsumer
+		assert.Nil(t, lc2.clone())
+	})
+}
+
+func Test_loadAllConsumer_Equal(t *testing.T) {
+	lc := loadAllConsumerOf(nil)
+
+	t.Run("equal", func(t *testing.T) {
+		lc2 := lc.clone()
+		assert.True(t, lc.Equal(lc2))
+	})
+
+	t.Run("not equal to non loadAllConsumer", func(t *testing.T) {
+		assert.False(t, lc.Equal(123))
+	})
+
+	t.Run("nil equal nil", func(t *testing.T) {
+		var lc2 *loadAllConsumer
+		var lc3 *loadAllConsumer
+		assert.True(t, lc2.Equal(lc3))
+	})
+
+	t.Run("baseConsumer", func(t *testing.T) {
+		lc2 := lc.clone()
+		lc2.baseConsumer = nil
+		assert.False(t, lc2.Equal(lc))
+		assert.False(t, lc.Equal(lc2))
+
+		lc3 := lc.clone()
+		lc3.baseConsumer = nil
+		assert.True(t, lc3.Equal(lc2))
+	})
+
+	t.Run("dep", func(t *testing.T) {
+		lc2 := lc.clone()
+		lc2.dep = nil
+		assert.False(t, lc2.Equal(lc))
+		assert.False(t, lc.Equal(lc2))
+
+		lc3 := lc.clone()
+		lc3.dep = nil
+		assert.True(t, lc3.Equal(lc2))
 	})
 }

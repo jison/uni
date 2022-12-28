@@ -55,6 +55,10 @@ func (sf *structField) Equal(other interface{}) bool {
 }
 
 func (sf *structField) clone() *structField {
+	if sf == nil {
+		return nil
+	}
+
 	return &structField{
 		dependency: sf.dependency.clone(),
 		ignored:    sf.ignored,
@@ -134,6 +138,10 @@ func (sc *structConsumer) Format(f fmt.State, r rune) {
 }
 
 func (sc *structConsumer) clone() *structConsumer {
+	if sc == nil {
+		return nil
+	}
+
 	cloned := &structConsumer{
 		baseConsumer: sc.baseConsumer.clone(),
 		sType:        sc.sType,
@@ -159,6 +167,10 @@ func (sc *structConsumer) Equal(other interface{}) bool {
 	o, ok := other.(*structConsumer)
 	if !ok {
 		return false
+	}
+
+	if sc == nil || o == nil {
+		return sc == nil && o == nil
 	}
 
 	if sc.sType != o.sType {

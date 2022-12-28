@@ -64,12 +64,20 @@ func Test_derivedAttrs_Get(t *testing.T) {
 			1, nil, false},
 		{"key exists at attrs", &derivedAttrs{nil, Attrs{1: 2, "a": "b"}},
 			1, 2, true},
-		{"key exists at parentEdges", &derivedAttrs{Attrs{3: 4}, Attrs{1: 2}},
+		{"key exists at parent", &derivedAttrs{Attrs{3: 4}, Attrs{1: 2}},
 			3, 4, true},
 		{"key does not exist", &derivedAttrs{Attrs{3: 4}, Attrs{1: 2, "a": "b"}},
 			"aa", nil, false},
-		{"have same key with parentEdges", &derivedAttrs{Attrs{1: 4}, Attrs{1: 2, "a": "b"}},
+		{"have same key with parent", &derivedAttrs{Attrs{1: 4}, Attrs{1: 2, "a": "b"}},
 			1, 2, true},
+		{"key has been deleted", &derivedAttrs{Attrs{1: 4}, Attrs{1: deletedFlag, "a": "b"}},
+			1, nil, false},
+		{"attrs have been deleted", &derivedAttrs{Attrs{1: 4},
+			Attrs{deletedFlag: deleteStatusDeleted}},
+			1, nil, false},
+		{"attrs have been restored", &derivedAttrs{Attrs{1: 4},
+			Attrs{deletedFlag: deleteStatusRestored, "a": "b"}},
+			1, nil, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -169,16 +177,32 @@ func Test_derivedAttrs_Iterate(t *testing.T) {
 	}
 
 	t.Run("interrupt iteration", func(t *testing.T) {
-		attrs := &derivedAttrs{Attrs{1: 2, "c": "d"}, Attrs{3: 4, "c": "d"}}
-		allAttr := Attrs{}
-		attrs.Iterate(func(key interface{}, value interface{}) bool {
-			assert.False(t, allAttr.Has(key))
-			allAttr[key] = value
-			assert.True(t, allAttr.Has(key))
+		attrs := &derivedAttrs{Attrs{1: 2, "a": "b", "c": "d"}, Attrs{3: 4, "c": "d2"}}
 
-			return allAttr.Len() < 2
-		})
-		assert.Equal(t, 2, allAttr.Len())
+		tests2 := []struct {
+			name  string
+			count int
+		}{
+			{"interrupt at derivedAttrs", 1},
+			{"interrupt after derivedAttrs", 2},
+			{"interrupt at parent", 3},
+			{"interrupt after parent", 4},
+		}
+
+		for _, tt := range tests2 {
+			t.Run(tt.name, func(t *testing.T) {
+				allAttr := Attrs{}
+				isContinue := attrs.Iterate(func(key interface{}, value interface{}) bool {
+					assert.False(t, allAttr.Has(key))
+					allAttr[key] = value
+					assert.True(t, allAttr.Has(key))
+
+					return allAttr.Len() < tt.count
+				})
+				assert.False(t, isContinue)
+				assert.Equal(t, tt.count, allAttr.Len())
+			})
+		}
 	})
 }
 
@@ -328,6 +352,15 @@ func Test_derivedNodeWithAttrs_Iterate(t *testing.T) {
 			assert.Equal(t, tt.want, nodesWithAttrsFromMustDistinct(d))
 		})
 	}
+
+	t.Run("derivedGraph is nil", func(t *testing.T) {
+		d := derivedNodeWithAttrs{
+			derivedGraph: nil,
+			parent:       NodesWithAttrs{1: {"a": "b"}, 2: {"a": "b"}},
+			nodes:        NodesWithAttrs{1: {"a": "b"}, 2: {"a": "b"}},
+		}
+		assert.Equal(t, NodesWithAttrs{}, nodesWithAttrsFromMustDistinct(d))
+	})
 
 	t.Run("interrupt iteration", func(t *testing.T) {
 		parent := NodesWithAttrs{1: {"a": "b"}, 2: {"a": "b"}}
@@ -508,6 +541,15 @@ func Test_derivedEdgeWithAttrs_Iterate(t *testing.T) {
 		})
 	}
 
+	t.Run("derivedGraph is nil", func(t *testing.T) {
+		d := &derivedEdgeWithAttrs{
+			derivedGraph: nil,
+			parentEdges:  EdgesWithAttrs{1: {2: {"a": "b"}}},
+			derivedEdges: nil,
+		}
+		assert.Equal(t, EdgesWithAttrs{}, edgesWithAttrsFromMustDistinct(d))
+	})
+
 	t.Run("interrupt iteration", func(t *testing.T) {
 		parentEdges := EdgesWithAttrs{1: {2: {"a": "b"}}, 3: {4: {"a": "b"}}}
 		derivedEdges := EdgesWithAttrs{2: {1: {"c": "d"}}, 3: {4: {}}}
@@ -557,6 +599,23 @@ func generateDirectedGraph() DirectedGraphView {
 }
 
 func Test_derivedDirectedGraph_NodeAttrs(t *testing.T) {
+	t.Run("derivedDirectedGraph is nil", func(t *testing.T) {
+		var dg *derivedDirectedGraph
+
+		attrs, ok := dg.NodeAttrs(1)
+		assert.False(t, ok)
+		assert.Equal(t, Attrs{}, attrsFromMustDistinct(attrs))
+	})
+
+	t.Run("invalid node", func(t *testing.T) {
+		dg := DeriveDirectedGraph(nil)
+		dg.AddNodeWithAttrs(1, nil)
+
+		attrs, ok := dg.NodeAttrs(map[int]int{})
+		assert.False(t, ok)
+		assert.Equal(t, Attrs{}, attrsFromMustDistinct(attrs))
+	})
+
 	t.Run("parentEdges is nil", func(t *testing.T) {
 		dg := DeriveDirectedGraph(nil)
 		dg.AddNodeWithAttrs(1, nil)
@@ -700,9 +759,15 @@ func Test_derivedDirectedGraph_NodeAttrs(t *testing.T) {
 		dg.AddNodeWithAttrs(20, Attrs{"k20": "v20"})
 		dg.AddNodeWithAttrs(1, Attrs{"a": "b"})
 
-		attrs1, ok1 := dg.NodeAttrs(1)
-		attrs2, ok2 := dg.NodeAttrs(2)
-		attrs20, ok20 := dg.NodeAttrs(20)
+		var attrs1, attrs2, attrs20 AttrsView
+		var ok1, ok2, ok20 bool
+		attrs1, ok1 = dg.NodeAttrs(1)
+		attrs2, ok2 = dg.NodeAttrs(2)
+		attrs20, ok20 = dg.NodeAttrs(20)
+
+		assert.True(t, ok1)
+		assert.True(t, ok2)
+		assert.True(t, ok20)
 
 		dg.RemoveNode(1)
 		dg.RemoveNode(2)
@@ -747,6 +812,13 @@ func Test_derivedDirectedGraph_NodeAttrs(t *testing.T) {
 }
 
 func Test_derivedDirectedGraph_Nodes(t *testing.T) {
+	t.Run("derivedDirectedGraph is nil", func(t *testing.T) {
+		var dg *derivedDirectedGraph
+
+		nodes := dg.Nodes()
+		assert.Equal(t, NodesWithAttrs{}, nodesWithAttrsFromMustDistinct(nodes))
+	})
+
 	t.Run("parentEdges is nil", func(t *testing.T) {
 		dg := DeriveDirectedGraph(nil)
 		dg.AddNodeWithAttrs(1, Attrs{"a": "b"})
@@ -929,6 +1001,26 @@ func Test_derivedDirectedGraph_Nodes(t *testing.T) {
 }
 
 func Test_derivedDirectedGraph_EdgeAttrs(t *testing.T) {
+	t.Run("derivedDirectedGraph is nil", func(t *testing.T) {
+		var dg *derivedDirectedGraph
+
+		attrs, ok := dg.EdgeAttrs(1, 2)
+		assert.False(t, ok)
+		assert.Equal(t, Attrs{}, attrsFromMustDistinct(attrs))
+	})
+
+	t.Run("invalid node", func(t *testing.T) {
+		var dg *derivedDirectedGraph
+
+		attrs, ok := dg.EdgeAttrs(func() {}, 2)
+		assert.False(t, ok)
+		assert.Equal(t, Attrs{}, attrsFromMustDistinct(attrs))
+
+		attrs2, ok2 := dg.EdgeAttrs(1, map[int]int{})
+		assert.False(t, ok2)
+		assert.Equal(t, Attrs{}, attrsFromMustDistinct(attrs2))
+	})
+
 	t.Run("parentEdges is nil", func(t *testing.T) {
 		dg := DeriveDirectedGraph(nil)
 		dg.AddEdgeWithAttrs(1, 2, Attrs{"a": "b"})
@@ -937,6 +1029,11 @@ func Test_derivedDirectedGraph_EdgeAttrs(t *testing.T) {
 
 		assert.True(t, ok)
 		assert.Equal(t, Attrs{"a": "b"}, attrsFromMustDistinct(attrs))
+
+		attrs2, ok2 := dg.EdgeAttrs(2, 1)
+
+		assert.False(t, ok2)
+		assert.Equal(t, Attrs{}, attrsFromMustDistinct(attrs2))
 	})
 
 	t.Run("edges in parentEdges graph", func(t *testing.T) {
@@ -1106,6 +1203,11 @@ func Test_derivedDirectedGraph_EdgeAttrs(t *testing.T) {
 		attrs1_20, ok1_20 := dg.EdgeAttrs(1, 20)
 		attrs21_1, ok21_1 := dg.EdgeAttrs(21, 1)
 
+		assert.True(t, ok2_1)
+		assert.True(t, ok20_21)
+		assert.True(t, ok1_20)
+		assert.True(t, ok21_1)
+
 		dg.RemoveEdge(2, 1)
 		dg.RemoveEdge(20, 21)
 		dg.RemoveEdge(1, 20)
@@ -1160,6 +1262,13 @@ func Test_derivedDirectedGraph_EdgeAttrs(t *testing.T) {
 }
 
 func Test_derivedDirectedGraph_Edges(t *testing.T) {
+	t.Run("derivedDirectedGraph is nil", func(t *testing.T) {
+		var dg *derivedDirectedGraph
+
+		edges := dg.Edges()
+		assert.Equal(t, EdgesWithAttrs{}, edgesWithAttrsFromMustDistinct(edges))
+	})
+
 	t.Run("parentEdges is nil", func(t *testing.T) {
 		dg := DeriveDirectedGraph(nil)
 		dg.AddEdgeWithAttrs(1, 2, Attrs{"a": "b"})
@@ -1353,6 +1462,19 @@ func Test_derivedDirectedGraph_Edges(t *testing.T) {
 }
 
 func Test_derivedDirectedGraph_OutEdgesOf(t *testing.T) {
+	t.Run("derivedDirectedGraph is nil", func(t *testing.T) {
+		var dg *derivedDirectedGraph
+
+		edges := dg.OutEdgesOf(1)
+		assert.Equal(t, EdgesWithAttrs{}, edgesWithAttrsFromMustDistinct(edges))
+	})
+
+	t.Run("invalid node", func(t *testing.T) {
+		dg := DeriveDirectedGraph(nil)
+		edges := dg.OutEdgesOf(func() {})
+		assert.Equal(t, EdgesWithAttrs{}, edgesWithAttrsFromMustDistinct(edges))
+	})
+
 	t.Run("parentEdges is nil", func(t *testing.T) {
 		dg := DeriveDirectedGraph(nil)
 		dg.AddEdgeWithAttrs(1, 2, Attrs{"a": "b"})
@@ -1530,6 +1652,19 @@ func Test_derivedDirectedGraph_OutEdgesOf(t *testing.T) {
 }
 
 func Test_derivedDirectedGraph_InEdgesOf(t *testing.T) {
+	t.Run("derivedDirectedGraph is nil", func(t *testing.T) {
+		var dg *derivedDirectedGraph
+
+		edges := dg.InEdgesOf(1)
+		assert.Equal(t, EdgesWithAttrs{}, edgesWithAttrsFromMustDistinct(edges))
+	})
+
+	t.Run("invalid node", func(t *testing.T) {
+		dg := DeriveDirectedGraph(nil)
+		edges := dg.InEdgesOf(func() {})
+		assert.Equal(t, EdgesWithAttrs{}, edgesWithAttrsFromMustDistinct(edges))
+	})
+
 	t.Run("parentEdges is nil", func(t *testing.T) {
 		dg := DeriveDirectedGraph(nil)
 		dg.AddEdgeWithAttrs(1, 2, Attrs{"a": "b"})
@@ -1710,6 +1845,22 @@ func Test_derivedDirectedGraph_InEdgesOf(t *testing.T) {
 }
 
 func Test_derivedDirectedGraph_AddNodeWithAttrs(t *testing.T) {
+	t.Run("derivedDirectedGraph is nil", func(t *testing.T) {
+		var dg *derivedDirectedGraph
+
+		assert.NotPanics(t, func() {
+			dg.AddNodeWithAttrs(1, Attrs{"a": "b"})
+			dg.AddNodeWithAttrs(func() {}, Attrs{"a": "b"})
+		})
+	})
+
+	t.Run("invalid node", func(t *testing.T) {
+		dg := DeriveDirectedGraph(nil)
+		assert.NotPanics(t, func() {
+			dg.AddNodeWithAttrs(func() {}, Attrs{"a": "b"})
+		})
+	})
+
 	t.Run("parentEdges is nil", func(t *testing.T) {
 		dg := DeriveDirectedGraph(nil)
 		dg.AddNodeWithAttrs(1, nil)
@@ -1779,6 +1930,23 @@ func Test_derivedDirectedGraph_AddNodeWithAttrs(t *testing.T) {
 }
 
 func Test_derivedDirectedGraph_RemoveNode(t *testing.T) {
+	t.Run("derivedDirectedGraph is nil", func(t *testing.T) {
+		var dg *derivedDirectedGraph
+
+		assert.NotPanics(t, func() {
+			dg.RemoveNode(1)
+			dg.RemoveNode(func() {})
+		})
+	})
+
+	t.Run("invalid nodes", func(t *testing.T) {
+		dg := DeriveDirectedGraph(nil)
+
+		assert.NotPanics(t, func() {
+			dg.RemoveNode(func() {})
+		})
+	})
+
 	t.Run("parentEdges is nil", func(t *testing.T) {
 		dg := DeriveDirectedGraph(nil)
 		dg.AddNodeWithAttrs(1, nil)
@@ -1860,6 +2028,22 @@ func Test_derivedDirectedGraph_RemoveNode(t *testing.T) {
 }
 
 func Test_derivedDirectedGraph_AddEdgeWithAttrs(t *testing.T) {
+	t.Run("derivedDirectedGraph is nil", func(t *testing.T) {
+		var dg *derivedDirectedGraph
+
+		assert.NotPanics(t, func() {
+			dg.AddEdgeWithAttrs(1, 2, Attrs{"a": "b"})
+			dg.AddEdgeWithAttrs(func() {}, map[int]int{}, Attrs{"a": "b"})
+		})
+	})
+
+	t.Run("invalid node", func(t *testing.T) {
+		dg := DeriveDirectedGraph(nil)
+		assert.NotPanics(t, func() {
+			dg.AddEdgeWithAttrs(func() {}, map[int]int{}, Attrs{"a": "b"})
+		})
+	})
+
 	t.Run("parentEdges is nil", func(t *testing.T) {
 		dg := DeriveDirectedGraph(nil)
 		dg.AddEdgeWithAttrs(1, 2, Attrs{"a": "b"})
@@ -1938,6 +2122,23 @@ func Test_derivedDirectedGraph_AddEdgeWithAttrs(t *testing.T) {
 }
 
 func Test_derivedDirectedGraph_RemoveEdge(t *testing.T) {
+	t.Run("derivedDirectedGraph is nil", func(t *testing.T) {
+		var dg *derivedDirectedGraph
+
+		assert.NotPanics(t, func() {
+			dg.RemoveEdge(1, 2)
+		})
+	})
+
+	t.Run("invalid nodes", func(t *testing.T) {
+		dg := DeriveDirectedGraph(nil)
+		dg.AddEdgeWithAttrs(1, 2, Attrs{"a": "b"})
+
+		assert.NotPanics(t, func() {
+			dg.RemoveEdge(func() {}, map[int]int{})
+		})
+	})
+
 	t.Run("parentEdges is nil", func(t *testing.T) {
 		dg := DeriveDirectedGraph(nil)
 		dg.AddEdgeWithAttrs(1, 2, Attrs{"a": "b"})
@@ -1992,4 +2193,24 @@ func Test_derivedDirectedGraph_RemoveEdge(t *testing.T) {
 		_, ok := dg.EdgeAttrs(20, 21)
 		assert.False(t, ok)
 	})
+}
+
+func Test_getDeleteStatus(t *testing.T) {
+	type args struct {
+		a AttrsView
+	}
+	tests := []struct {
+		name string
+		args args
+		want deleteStatus
+	}{
+		{"have not flag", args{Attrs{}}, deleteStatusUnknown},
+		{"have flag", args{Attrs{deletedFlag: deleteStatusDeleted}}, deleteStatusDeleted},
+		{"type of flag is wrong", args{Attrs{deletedFlag: 123}}, deleteStatusUnknown},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equalf(t, tt.want, getDeleteStatus(tt.args.a), "getDeleteStatus(%v)", tt.args.a)
+		})
+	}
 }

@@ -37,10 +37,6 @@ func (s *symbol) Format(f fmt.State, verb rune) {
 	}
 }
 
-func (s *symbol) String() string {
-	return fmt.Sprintf("%v", s)
-}
-
 func NewSymbol(name string) Symbol {
 	t := symbol{}
 	t.name = name

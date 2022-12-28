@@ -371,48 +371,31 @@ func (dg *dependenceGraph) InputNodesTo(node Node) NodeCollection {
 	return NewNodeCollection(&graphNodeIterator{gi})
 }
 
+func (dg *dependenceGraph) getInputComponentsToGNode(gNode graph.Node) model.ComponentCollection {
+	coms := model.ComponentSlice{}
+	graph.PredecessorsOf(dg.graph, gNode).Iterate(func(inputNode graph.Node, _ graph.AttrsView) bool {
+		if valNode, isValuer := inputNode.(valuer.Valuer); isValuer {
+			if com, isCom := dg.ComponentOfNode(valNode); isCom {
+				coms = append(coms, com)
+				return true
+			}
+		}
+
+		dg.getInputComponentsToGNode(inputNode).Each(func(com model.Component) {
+			coms = append(coms, com)
+		})
+		return true
+	})
+	return coms
+}
+
 func (dg *dependenceGraph) InputComponentsToDependency(dep model.Dependency) model.ComponentCollection {
 	depNode, depExist := dg.NodeOfDependency(dep)
 	if !depExist {
 		return model.EmptyComponents()
 	}
 
-	getComponentFromGraphNode := func(gNode graph.Node) (model.Component, bool) {
-		var ok bool
-		var valNode Node
-		if valNode, ok = gNode.(valuer.Valuer); !ok {
-			return nil, false
-		}
-
-		var com model.Component
-		if com, ok = dg.ComponentOfNode(valNode); !ok {
-			return nil, false
-		}
-
-		return com, true
-	}
-
-	gi := graph.GetNodesInDirectionMatch(depNode,
-		func(node graph.Node) graph.NodeAndAttrsIterator {
-			return graph.PredecessorsOf(dg.graph, node)
-		},
-		func(gNode graph.Node, attrs graph.AttrsView) bool {
-			_, ok := getComponentFromGraphNode(gNode)
-			return ok
-		},
-	)
-
-	return model.ComponentsOfIterator(model.FuncComponentIterator(func(f func(model.Component) bool) bool {
-		return gi.Iterate(func(gNode graph.Node, _ graph.AttrsView) bool {
-			com, ok := getComponentFromGraphNode(gNode)
-			if ok {
-				if !f(com) {
-					return false
-				}
-			}
-			return true
-		})
-	}))
+	return dg.getInputComponentsToGNode(depNode)
 }
 
 func (dg *dependenceGraph) InputComponentsTo(com model.Component) model.ComponentCollection {

@@ -15,7 +15,7 @@ func testFunc1(a string, b int) string {
 
 func testFunc2() {}
 
-func TestFuncValuer(t *testing.T) {
+func Test_funcValuer_Value(t *testing.T) {
 	t.Run("with normal function", func(t *testing.T) {
 		valuer := Func(reflect.ValueOf(testFunc1))
 		inputs := ValuesOf(
@@ -143,6 +143,37 @@ func TestFuncValuer(t *testing.T) {
 		assert.ErrorIs(t, err, err1)
 	})
 
+	t.Run("invalid input", func(t *testing.T) {
+		type testStruct struct {
+			a int
+		}
+		ts := testStruct{123}
+		tsVal := reflect.ValueOf(ts)
+
+		tests := []struct {
+			name  string
+			input Value
+		}{
+			{"input is not a single value", ArrayValue([]reflect.Value{})},
+			{"CanInterface() is false", SingleValue(tsVal.FieldByName("a"))},
+			{"input is not a funcParam", SingleValue(reflect.ValueOf(123))},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				valuer := Func(reflect.ValueOf(testFunc1))
+				inputs := []Value{
+					SingleValue(reflect.ValueOf(funcParam{index: 1, val: reflect.ValueOf(123)})),
+					tt.input,
+				}
+				res := valuer.Value(inputs)
+				err, ok := res.AsError()
+				assert.True(t, ok)
+				assert.NotNil(t, err)
+			})
+		}
+	})
+
 	t.Run("with no return value", func(t *testing.T) {
 		func1 := func(a, b int) {
 
@@ -189,6 +220,22 @@ func TestFuncValuer(t *testing.T) {
 		assert.Equal(t, 123, arr[1].Interface())
 	})
 
+	t.Run("function return error", func(t *testing.T) {
+		err := errors.Newf("this is an error")
+		func1 := func(a int, b string) (string, int, error) {
+			return b, a, err
+		}
+		valuer := Func(reflect.ValueOf(func1))
+		inputs := ValuesOf(
+			funcParam{index: 1, val: reflect.ValueOf("abc")},
+			funcParam{index: 0, val: reflect.ValueOf(123)},
+		)
+		res := valuer.Value(inputs)
+		err2, ok := res.AsError()
+		assert.True(t, ok)
+		assert.ErrorIs(t, err2, err)
+	})
+
 	t.Run("with not func value", func(t *testing.T) {
 		valuer := Func(reflect.ValueOf(123))
 		res := valuer.Value(nil)
@@ -221,41 +268,43 @@ func TestFuncValuer(t *testing.T) {
 
 		assert.Equal(t, 8, arr[0].Interface())
 	})
+}
 
-	t.Run("String", func(t *testing.T) {
-		valuer := Func(reflect.ValueOf(testFunc1))
-		assert.Equal(t, "Func: func(string, int) string", valuer.String())
-	})
+func Test_funcValuer_String(t *testing.T) {
+	valuer := Func(reflect.ValueOf(testFunc1))
+	assert.Equal(t, "Func: func(string, int) string", valuer.String())
+}
 
-	t.Run("Clone", func(t *testing.T) {
+func Test_funcValuer_Clone(t *testing.T) {
+	v1 := Func(reflect.ValueOf(testFunc1))
+	v2 := v1.Clone()
+
+	assert.False(t, v1 == v2)
+	assert.Equal(t, v1, v2)
+	assert.True(t, v1.Equal(v2))
+}
+
+func Test_funcValuer_Equal(t *testing.T) {
+	t.Run("equal", func(t *testing.T) {
 		v1 := Func(reflect.ValueOf(testFunc1))
-		v2 := v1.Clone()
-
-		assert.False(t, v1 == v2)
-		assert.Equal(t, v1, v2)
+		v2 := Func(reflect.ValueOf(testFunc1))
 		assert.True(t, v1.Equal(v2))
 	})
 
-	t.Run("Equal", func(t *testing.T) {
-		t.Run("equal", func(t *testing.T) {
-			v1 := Func(reflect.ValueOf(testFunc1))
-			v2 := Func(reflect.ValueOf(testFunc1))
-			assert.True(t, v1.Equal(v2))
-		})
+	t.Run("not equal", func(t *testing.T) {
+		v1 := Func(reflect.ValueOf(testFunc1))
+		v2 := Func(reflect.ValueOf(testFunc2))
+		v3 := Identity()
+		assert.False(t, v1.Equal(v2))
+		assert.False(t, v1.Equal(v3))
+	})
 
-		t.Run("not equal", func(t *testing.T) {
-			v1 := Func(reflect.ValueOf(testFunc1))
-			v2 := Func(reflect.ValueOf(testFunc2))
-			assert.False(t, v1.Equal(v2))
-		})
-
-		t.Run("nil", func(t *testing.T) {
-			var v1 *funcValuer
-			var v2 *funcValuer
-			var v3 = Func(reflect.ValueOf(testFunc1))
-			assert.True(t, v1.Equal(v2))
-			assert.False(t, v1.Equal(v3))
-			assert.False(t, v3.Equal(v1))
-		})
+	t.Run("nil", func(t *testing.T) {
+		var v1 *funcValuer
+		var v2 *funcValuer
+		var v3 = Func(reflect.ValueOf(testFunc1))
+		assert.True(t, v1.Equal(v2))
+		assert.False(t, v1.Equal(v3))
+		assert.False(t, v3.Equal(v1))
 	})
 }
