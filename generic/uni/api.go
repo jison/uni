@@ -102,7 +102,7 @@ func convertTo[T any](val any, err error) (T, error) {
 
 func FuncOfT(c Container, f any, opts ...model.FuncConsumerOption) ([]any, error) {
 	opts = append(opts, model.UpdateCallLocation())
-	val, err := FuncOf(c, f, opts...)
+	val, err := core.FuncOf(c, f, opts...)
 	return convertTo[[]any](val, err)
 }
 
@@ -120,7 +120,7 @@ func ValueOfT[T any](c Container, opts ...model.ValueConsumerOption) (T, error) 
 
 func FuncOfCtxT(ctx context.Context, f any, opts ...model.FuncConsumerOption) ([]any, error) {
 	opts = append(opts, model.UpdateCallLocation())
-	val, err := FuncOfCtx(ctx, f, opts...)
+	val, err := core.FuncOfCtx(ctx, f, opts...)
 	return convertTo[[]any](val, err)
 }
 
@@ -183,10 +183,10 @@ func suppressUnusedWarningDslGeneric() {
 	var _ = TypeT[any]
 	var _ = AsT[any]
 	var _ = StructT[any]
-	var _ = FuncOfT[any]
+	var _ = FuncOfT
 	var _ = StructOfT[any]
 	var _ = ValueOfT[any]
-	var _ = FuncOfCtxT[any]
+	var _ = FuncOfCtxT
 	var _ = StructOfCtxT[any]
 	var _ = ValueOfCtxT[any]
 }
