@@ -300,7 +300,7 @@ func Test_scopeStorage_GetOrElse(t *testing.T) {
 		ss2, _ := ss1.Enter(scope2)
 
 		t.Run("get one node concurrently", func(t *testing.T) {
-			counter := atomic.Int32{}
+			var counter int32
 			n := 20
 			node := valuer.Identity()
 			finalVal := -1
@@ -309,7 +309,7 @@ func Test_scopeStorage_GetOrElse(t *testing.T) {
 				wg.Add(1)
 				go func(v int) {
 					val := ss2.GetOrElse(node, scope2, func(_ ScopeBaseStorage) valuer.Value {
-						counter.Add(1)
+						atomic.AddInt32(&counter, 1)
 						finalVal = v
 						return valuer.SingleValue(reflect.ValueOf(v))
 					})
@@ -318,7 +318,7 @@ func Test_scopeStorage_GetOrElse(t *testing.T) {
 				}(i)
 			}
 			wg.Wait()
-			assert.Equal(t, 1, int(counter.Load()))
+			assert.Equal(t, 1, int(atomic.LoadInt32(&counter)))
 			val := ss2.GetOrElse(node, scope2, func(_ ScopeBaseStorage) valuer.Value {
 				return valuer.SingleValue(reflect.ValueOf(n + 1))
 			})
@@ -332,7 +332,7 @@ func Test_scopeStorage_GetOrElse(t *testing.T) {
 				node    Node
 				scope   model.Scope
 				val     int
-				counter atomic.Int32
+				counter int32
 			}
 
 			randomScope := func() model.Scope {
@@ -347,7 +347,7 @@ func Test_scopeStorage_GetOrElse(t *testing.T) {
 					node:    valuer.Identity(),
 					scope:   randomScope(),
 					val:     -1,
-					counter: atomic.Int32{},
+					counter: 0,
 				})
 			}
 
@@ -358,7 +358,7 @@ func Test_scopeStorage_GetOrElse(t *testing.T) {
 				go func(v int) {
 					info := infos[rand.Intn(nodeCount)]
 					val := ss2.GetOrElse(info.node, info.scope, func(_ ScopeBaseStorage) valuer.Value {
-						info.counter.Add(1)
+						atomic.AddInt32(&info.counter, 1)
 						info.val = v
 						return valuer.SingleValue(reflect.ValueOf(v))
 					})
@@ -370,7 +370,7 @@ func Test_scopeStorage_GetOrElse(t *testing.T) {
 
 			for i := 0; i < nodeCount; i++ {
 				info := infos[i]
-				assert.Equal(t, 1, int(info.counter.Load()))
+				assert.Equal(t, 1, int(atomic.LoadInt32(&info.counter)))
 				val := ss2.GetOrElse(info.node, info.scope, nil)
 				rVal, ok := val.AsSingle()
 				assert.True(t, ok)
