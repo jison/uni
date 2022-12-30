@@ -1,0 +1,47 @@
+# This workflow will build a golang project
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
+
+name: Go
+
+on:
+  push:
+    branches: [ "*" ]
+    tags: ['v*']
+  pull_request:
+    branches: [ "*" ]
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go: ["1.17.x", "1.18.x", "1.19.x"]
+        include:
+        - go: 1.19.x
+          latest: true
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: ${{ matrix.go }}
+        cache: true
+        cache-dependency-path: go.sum
+    
+    - name: Build uni
+      run: go build -v ./...
+      
+    - name: Build generic
+      run: cd generic && go build -v ./...
+
+    - name: Test
+      run: |
+        go test -race -coverprofile=cover.out -coverpkg=./... ./...
+        go tool cover -html=cover.out -o cover.html
+    
+    - name: Codecov
+      uses: codecov/codecov-action@v3.1.1
