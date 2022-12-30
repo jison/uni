@@ -1,5 +1,11 @@
 # Uni
 
+[![GitHub release](https://img.shields.io/github/release/jison/uni.svg)](https://github.com/jison/uni/releases/)
+[![Build Status](https://github.com/jison/uni/actions/workflows/go.yml/badge.svg)](https://github.com/jison/uni/actions)
+[![codecov](https://codecov.io/github/jison/uni/branch/main/graph/badge.svg?token=W2DZ6I43Q6)](https://codecov.io/github/jison/uni)
+[![Go Report Card](https://goreportcard.com/badge/github.com/jison/uni)](https://goreportcard.com/report/github.com/jison/uni)
+[![MIT license](https://img.shields.io/badge/License-MIT-blue.svg)](https://lbesson.mit-license.org/)
+
 > a dependency injection library for golang
 
 **WARNING: This project has not been fully validated in a production
