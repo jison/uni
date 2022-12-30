@@ -119,6 +119,20 @@ func (fp *funcProvider) clone() *funcProvider {
 	return newFP
 }
 
+func comsEqual(coms1 componentByIndex, coms2 componentByIndex) bool {
+	if len(coms1) != len(coms2) {
+		return false
+	}
+	for i, com := range coms1 {
+		if com2, ok := coms2[i]; !ok {
+			return false
+		} else if !com.Equal(com2) {
+			return false
+		}
+	}
+	return true
+}
+
 func (fp *funcProvider) Equal(other interface{}) bool {
 	o, ok := other.(*funcProvider)
 	if !ok {
@@ -128,34 +142,18 @@ func (fp *funcProvider) Equal(other interface{}) bool {
 		return fp == nil && o == nil
 	}
 
-	if fp.funcConsumer != nil {
-		if !fp.funcConsumer.Equal(o.funcConsumer) {
-			return false
-		}
-	} else if o.funcConsumer != nil {
+	if fp.funcConsumer != nil && !fp.funcConsumer.Equal(o.funcConsumer) {
+		return false
+	}
+	if fp.funcConsumer == nil && o.funcConsumer != nil {
 		return false
 	}
 
-	if len(fp.components) != len(o.components) {
+	if !comsEqual(fp.components, o.components) {
 		return false
 	}
-	for i, com := range fp.components {
-		if com2, comOk := o.components[i]; !comOk {
-			return false
-		} else if !com.Equal(com2) {
-			return false
-		}
-	}
-
-	if len(fp.fakeComponents) != len(o.fakeComponents) {
+	if !comsEqual(fp.fakeComponents, o.fakeComponents) {
 		return false
-	}
-	for i, com := range fp.fakeComponents {
-		if com2, comOk := o.fakeComponents[i]; !comOk {
-			return false
-		} else if !com.Equal(com2) {
-			return false
-		}
 	}
 
 	return true

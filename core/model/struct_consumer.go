@@ -163,6 +163,22 @@ func (sc *structConsumer) clone() *structConsumer {
 	return cloned
 }
 
+func fieldsEqual(fields1 fieldByName, fields2 fieldByName) bool {
+	if len(fields1) != len(fields2) {
+		return false
+	}
+
+	for name, f := range fields1 {
+		if f2, ok := fields2[name]; !ok {
+			return false
+		} else if !f.Equal(f2) {
+			return false
+		}
+	}
+
+	return true
+}
+
 func (sc *structConsumer) Equal(other interface{}) bool {
 	o, ok := other.(*structConsumer)
 	if !ok {
@@ -177,35 +193,18 @@ func (sc *structConsumer) Equal(other interface{}) bool {
 		return false
 	}
 
-	if len(sc.fields) != len(o.fields) {
+	if !fieldsEqual(sc.fields, o.fields) {
 		return false
 	}
 
-	for name, f := range sc.fields {
-		if f2, fok := o.fields[name]; !fok {
-			return false
-		} else if !f.Equal(f2) {
-			return false
-		}
-	}
-
-	if len(sc.fakeFields) != len(o.fakeFields) {
+	if !fieldsEqual(sc.fakeFields, o.fakeFields) {
 		return false
 	}
 
-	for name, f := range sc.fakeFields {
-		if f2, fok := o.fakeFields[name]; !fok {
-			return false
-		} else if !f.Equal(f2) {
-			return false
-		}
+	if sc.baseConsumer != nil && !sc.baseConsumer.Equal(o.baseConsumer) {
+		return false
 	}
-
-	if sc.baseConsumer != nil {
-		if !sc.baseConsumer.Equal(o.baseConsumer) {
-			return false
-		}
-	} else if o.baseConsumer != nil {
+	if sc.baseConsumer == nil && o.baseConsumer != nil {
 		return false
 	}
 

@@ -151,6 +151,20 @@ func (fc *funcConsumer) clone() *funcConsumer {
 	return cloned
 }
 
+func paramsEquals(params1 paramByIndex, params2 paramByIndex) bool {
+	if len(params1) != len(params2) {
+		return false
+	}
+	for index, p := range params1 {
+		if p2, ok := params2[index]; !ok {
+			return false
+		} else if !p2.Equal(p) {
+			return false
+		}
+	}
+	return true
+}
+
 func (fc *funcConsumer) Equal(other interface{}) bool {
 	o, ok := other.(*funcConsumer)
 	if !ok {
@@ -163,32 +177,18 @@ func (fc *funcConsumer) Equal(other interface{}) bool {
 	if fc.funcVal != o.funcVal {
 		return false
 	}
-	if len(fc.params) != len(o.params) {
+
+	if !paramsEquals(fc.params, o.params) {
 		return false
 	}
-	for index, p := range fc.params {
-		if p2, pok := o.params[index]; !pok {
-			return false
-		} else if !p2.Equal(p) {
-			return false
-		}
-	}
-	if len(fc.fakeParams) != len(o.fakeParams) {
+	if !paramsEquals(fc.fakeParams, o.fakeParams) {
 		return false
-	}
-	for index, p := range fc.fakeParams {
-		if p2, pok := o.fakeParams[index]; !pok {
-			return false
-		} else if !p2.Equal(p) {
-			return false
-		}
 	}
 
-	if fc.baseConsumer != nil {
-		if !fc.baseConsumer.Equal(o.baseConsumer) {
-			return false
-		}
-	} else if o.baseConsumer != nil {
+	if fc.baseConsumer != nil && !fc.baseConsumer.Equal(o.baseConsumer) {
+		return false
+	}
+	if fc.baseConsumer == nil && o.baseConsumer != nil {
 		return false
 	}
 

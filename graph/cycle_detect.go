@@ -107,41 +107,41 @@ func (s NodeSet) Del(node Node) {
 	delete(s, node)
 }
 
+func _unblock(node Node, blocked NodeSet, B map[Node]NodeSet) {
+	stack := []Node{node}
+	for len(stack) > 0 {
+		n := stack[len(stack)-1]
+		stack = stack[0 : len(stack)-1]
+		if blocked.Has(n) {
+			blocked.Del(n)
+			for nn := range B[n] {
+				stack = append(stack, nn)
+			}
+			B[n] = NodeSet{}
+		}
+	}
+}
+
+type stackItem struct {
+	node      Node
+	neighbors []Node
+}
+
+func _pushStack(stack []*stackItem, g DirectedGraph, node Node) []*stackItem {
+	var neighbors []Node
+	SuccessorsOf(g, node).Iterate(func(n Node, _ AttrsView) bool {
+		neighbors = append(neighbors, n)
+		return true
+	})
+	return append(stack, &stackItem{
+		node:      node,
+		neighbors: neighbors,
+	})
+}
+
 // FindCycles
 // see https://github.com/networkx/networkx/blob/main/networkx/algorithms/cycles.py#L98
 func FindCycles(g DirectedGraphView) []Cycle {
-	_unblock := func(node Node, blocked NodeSet, B map[Node]NodeSet) {
-		stack := []Node{node}
-		for len(stack) > 0 {
-			n := stack[len(stack)-1]
-			stack = stack[0 : len(stack)-1]
-			if blocked.Has(n) {
-				blocked.Del(n)
-				for nn := range B[n] {
-					stack = append(stack, nn)
-				}
-				B[n] = NodeSet{}
-			}
-		}
-	}
-
-	type stackItem struct {
-		node      Node
-		neighbors []Node
-	}
-
-	_pushStack := func(stack []*stackItem, g DirectedGraph, node Node) []*stackItem {
-		var neighbors []Node
-		SuccessorsOf(g, node).Iterate(func(n Node, _ AttrsView) bool {
-			neighbors = append(neighbors, n)
-			return true
-		})
-		return append(stack, &stackItem{
-			node:      node,
-			neighbors: neighbors,
-		})
-	}
-
 	subG := NewDirectedGraph()
 	g.Edges().Iterate(func(from Node, to Node, attrs AttrsView) bool {
 		AddEdge(subG, from, to)
@@ -213,9 +213,7 @@ func FindCycles(g DirectedGraphView) []Cycle {
 							set = NodeSet{}
 							B[nbr] = set
 						}
-						if !set.Has(thisNode) {
-							set.Add(thisNode)
-						}
+						set.Add(thisNode)
 						return true
 					})
 				}

@@ -374,6 +374,38 @@ func Test_funcProvider_Provider(t *testing.T) {
 	})
 }
 
+func verifyComponentWithName(t *testing.T, coms ComponentCollection, name string, f func(t *testing.T, com Component)) {
+	var com Component
+	coms.Iterate(func(c Component) bool {
+		if c.Name() == name {
+			com = c
+			return false
+		}
+		return true
+	})
+	if com == nil {
+		t.Errorf("can not find component with name %s", name)
+	} else {
+		f(t, com)
+	}
+}
+
+func verifyDependencyWithName(t *testing.T, deps DependencyIterator, name string, f func(t *testing.T, dep Dependency)) {
+	var dep Dependency
+	deps.Iterate(func(d Dependency) bool {
+		if d.Name() == name {
+			dep = d
+			return false
+		}
+		return true
+	})
+	if dep == nil {
+		t.Errorf("can not find dependency with name %s", name)
+	} else {
+		f(t, dep)
+	}
+}
+
 func Test_funcProvider_StructProviderBuilder(t *testing.T) {
 	type testInterface interface{}
 
@@ -387,32 +419,32 @@ func Test_funcProvider_StructProviderBuilder(t *testing.T) {
 	t.Run("ApplyModule", func(t *testing.T) {
 		fp := fp0.clone()
 		fp.Return(0, Name("r1"), Tags(tag2), Hide(), Ignore(), As(TypeOf((*testInterface)(nil))))
-		fp.Return(1)
+		fp.Return(1, Name("r2"))
 
 		mb := NewModuleBuilder()
 		fp.ApplyModule(mb)
 
 		coms := mb.Module().AllComponents().ToArray()
 		assert.Equal(t, 2, len(coms))
-		for _, com := range coms {
-			if com.Name() == "r1" {
-				assert.Equal(t, TypeOf(&testStructForFuncProviderTest{}), com.Type())
-				assert.Equal(t, "r1", com.Name())
-				assert.Equal(t, newSymbolSet(tag2), com.Tags())
-				assert.Equal(t, newTypeSet(TypeOf((*testInterface)(nil))), com.As())
-				assert.Equal(t, true, com.Ignored())
-				assert.Equal(t, true, com.Hidden())
-				assert.Equal(t, valuer.Index(0), com.Valuer())
-			} else {
-				assert.Equal(t, TypeOf(1), com.Type())
-				assert.Equal(t, "", com.Name())
-				assert.Equal(t, (*symbolSet)(nil), com.Tags())
-				assert.Equal(t, (*typeSet)(nil), com.As())
-				assert.Equal(t, false, com.Ignored())
-				assert.Equal(t, false, com.Hidden())
-				assert.Equal(t, valuer.Index(1), com.Valuer())
-			}
-		}
+		verifyComponentWithName(t, coms, "r1", func(t *testing.T, com Component) {
+			assert.Equal(t, TypeOf(&testStructForFuncProviderTest{}), com.Type())
+			assert.Equal(t, "r1", com.Name())
+			assert.Equal(t, newSymbolSet(tag2), com.Tags())
+			assert.Equal(t, newTypeSet(TypeOf((*testInterface)(nil))), com.As())
+			assert.Equal(t, true, com.Ignored())
+			assert.Equal(t, true, com.Hidden())
+			assert.Equal(t, valuer.Index(0), com.Valuer())
+		})
+
+		verifyComponentWithName(t, coms, "r2", func(t *testing.T, com Component) {
+			assert.Equal(t, TypeOf(1), com.Type())
+			assert.Equal(t, "r2", com.Name())
+			assert.Equal(t, (*symbolSet)(nil), com.Tags())
+			assert.Equal(t, (*typeSet)(nil), com.As())
+			assert.Equal(t, false, com.Ignored())
+			assert.Equal(t, false, com.Hidden())
+			assert.Equal(t, valuer.Index(1), com.Valuer())
+		})
 	})
 
 	t.Run("Provide", func(t *testing.T) {
@@ -420,9 +452,9 @@ func Test_funcProvider_StructProviderBuilder(t *testing.T) {
 		fp.Param(0, ByName("a1"), ByTags(tag1), Optional(true))
 		fp.Param(1, ByName("b1"))
 		fp.Param(2, ByName("c1"), AsCollector(true))
-		fp.Param(3)
+		fp.Param(3, ByName("d1"))
 		fp.Return(0, Name("r1"), Tags(tag2), Hide(), Ignore(), As(TypeOf((*testInterface)(nil))))
-		fp.Return(1)
+		fp.Return(1, Name("r2"))
 		fp.SetScope(scope1)
 		fp.SetLocation(loc1)
 
@@ -432,63 +464,70 @@ func Test_funcProvider_StructProviderBuilder(t *testing.T) {
 
 		deps := dependencyIteratorToArray(pro.Dependencies())
 		assert.Equal(t, 4, len(deps))
-		for _, dep := range deps {
-			if dep.Name() == "a1" {
-				assert.Equal(t, TypeOf(1), dep.Type())
-				assert.Equal(t, "a1", dep.Name())
-				assert.Equal(t, newSymbolSet(tag1), dep.Tags())
-				assert.Equal(t, valuer.Param(0), dep.Valuer())
-				assert.True(t, dep.Optional())
-				assert.False(t, dep.IsCollector())
-			} else if dep.Name() == "b1" {
-				assert.Equal(t, TypeOf(""), dep.Type())
-				assert.Equal(t, "b1", dep.Name())
-				assert.Equal(t, (*symbolSet)(nil), dep.Tags())
-				assert.Equal(t, valuer.Param(1), dep.Valuer())
-				assert.False(t, dep.Optional())
-				assert.False(t, dep.IsCollector())
-			} else if dep.Name() == "c1" {
-				assert.Equal(t, TypeOf(0), dep.Type())
-				assert.Equal(t, "c1", dep.Name())
-				assert.Equal(t, (*symbolSet)(nil), dep.Tags())
-				assert.Equal(t, valuer.Param(2), dep.Valuer())
-				assert.False(t, dep.Optional())
-				assert.True(t, dep.IsCollector())
-			} else {
-				assert.Equal(t, TypeOf('d'), dep.Type())
-				assert.Equal(t, "", dep.Name())
-				assert.Equal(t, (*symbolSet)(nil), dep.Tags())
-				assert.Equal(t, valuer.Param(3), dep.Valuer())
-				assert.False(t, dep.Optional())
-				assert.False(t, dep.IsCollector())
-			}
-
+		verifyDependencyWithName(t, pro.Dependencies(), "a1", func(t *testing.T, dep Dependency) {
+			assert.Equal(t, TypeOf(1), dep.Type())
+			assert.Equal(t, "a1", dep.Name())
+			assert.Equal(t, newSymbolSet(tag1), dep.Tags())
+			assert.Equal(t, valuer.Param(0), dep.Valuer())
+			assert.True(t, dep.Optional())
+			assert.False(t, dep.IsCollector())
 			assert.Same(t, pro, dep.Consumer())
-		}
+		})
+
+		verifyDependencyWithName(t, pro.Dependencies(), "b1", func(t *testing.T, dep Dependency) {
+			assert.Equal(t, TypeOf(""), dep.Type())
+			assert.Equal(t, "b1", dep.Name())
+			assert.Equal(t, (*symbolSet)(nil), dep.Tags())
+			assert.Equal(t, valuer.Param(1), dep.Valuer())
+			assert.False(t, dep.Optional())
+			assert.False(t, dep.IsCollector())
+			assert.Same(t, pro, dep.Consumer())
+		})
+
+		verifyDependencyWithName(t, pro.Dependencies(), "c1", func(t *testing.T, dep Dependency) {
+			assert.Equal(t, TypeOf(0), dep.Type())
+			assert.Equal(t, "c1", dep.Name())
+			assert.Equal(t, (*symbolSet)(nil), dep.Tags())
+			assert.Equal(t, valuer.Param(2), dep.Valuer())
+			assert.False(t, dep.Optional())
+			assert.True(t, dep.IsCollector())
+			assert.Same(t, pro, dep.Consumer())
+		})
+
+		verifyDependencyWithName(t, pro.Dependencies(), "d1", func(t *testing.T, dep Dependency) {
+			assert.Equal(t, TypeOf('d'), dep.Type())
+			assert.Equal(t, "d1", dep.Name())
+			assert.Equal(t, (*symbolSet)(nil), dep.Tags())
+			assert.Equal(t, valuer.Param(3), dep.Valuer())
+			assert.False(t, dep.Optional())
+			assert.False(t, dep.IsCollector())
+			assert.Same(t, pro, dep.Consumer())
+		})
 
 		coms := pro.Components().ToArray()
 		assert.Equal(t, 2, len(coms))
-		for _, com := range coms {
-			if com.Name() == "r1" {
-				assert.Equal(t, TypeOf(&testStructForFuncProviderTest{}), com.Type())
-				assert.Equal(t, "r1", com.Name())
-				assert.Equal(t, newSymbolSet(tag2), com.Tags())
-				assert.Equal(t, newTypeSet(TypeOf((*testInterface)(nil))), com.As())
-				assert.Equal(t, true, com.Ignored())
-				assert.Equal(t, true, com.Hidden())
-				assert.Equal(t, valuer.Index(0), com.Valuer())
-			} else {
-				assert.Equal(t, TypeOf(1), com.Type())
-				assert.Equal(t, "", com.Name())
-				assert.Equal(t, (*symbolSet)(nil), com.Tags())
-				assert.Equal(t, (*typeSet)(nil), com.As())
-				assert.Equal(t, false, com.Ignored())
-				assert.Equal(t, false, com.Hidden())
-				assert.Equal(t, valuer.Index(1), com.Valuer())
-			}
 
+		verifyComponentWithName(t, coms, "r1", func(t *testing.T, com Component) {
+			assert.Equal(t, TypeOf(&testStructForFuncProviderTest{}), com.Type())
+			assert.Equal(t, "r1", com.Name())
+			assert.Equal(t, newSymbolSet(tag2), com.Tags())
+			assert.Equal(t, newTypeSet(TypeOf((*testInterface)(nil))), com.As())
+			assert.Equal(t, true, com.Ignored())
+			assert.Equal(t, true, com.Hidden())
+			assert.Equal(t, valuer.Index(0), com.Valuer())
 			assert.Same(t, pro, com.Provider())
-		}
+		})
+
+		verifyComponentWithName(t, coms, "r2", func(t *testing.T, com Component) {
+			assert.Equal(t, TypeOf(1), com.Type())
+			assert.Equal(t, "r2", com.Name())
+			assert.Equal(t, (*symbolSet)(nil), com.Tags())
+			assert.Equal(t, (*typeSet)(nil), com.As())
+			assert.Equal(t, false, com.Ignored())
+			assert.Equal(t, false, com.Hidden())
+			assert.Equal(t, valuer.Index(1), com.Valuer())
+			assert.Same(t, pro, com.Provider())
+		})
 
 		assert.Equal(t, valuer.Func(reflect.ValueOf(funcForFuncProviderTest)), pro.Valuer())
 		assert.Equal(t, loc1, pro.Location())
@@ -499,34 +538,24 @@ func Test_funcProvider_StructProviderBuilder(t *testing.T) {
 		t.Run("Optional", func(t *testing.T) {
 			fp := fp0.clone()
 			fp.Param(0, ByName("p0"), Optional(true))
-			meet := false
-			fp.Provider().Dependencies().Iterate(func(dep Dependency) bool {
-				if dep.Name() == "p0" {
-					meet = true
-					assert.True(t, dep.Optional())
-				}
-				return true
+
+			verifyDependencyWithName(t, fp.Provider().Dependencies(), "p0", func(t *testing.T, dep Dependency) {
+				assert.True(t, dep.Optional())
 			})
-			assert.True(t, meet)
 		})
 
 		t.Run("AsCollector", func(t *testing.T) {
 			fp := fp0.clone()
 			fp.Param(2, ByName("p2"), AsCollector(true))
-			meet := false
-			fp.Provider().Dependencies().Iterate(func(dep Dependency) bool {
-				if dep.Name() == "p2" {
-					meet = true
-					assert.True(t, dep.IsCollector())
-				}
-				return true
+			verifyDependencyWithName(t, fp.Provider().Dependencies(), "p2", func(t *testing.T, dep Dependency) {
+				assert.True(t, dep.IsCollector())
 			})
-			assert.True(t, meet)
 		})
 
 		t.Run("Name", func(t *testing.T) {
 			fp := fp0.clone()
 			fp.Param(0, ByName("p0"))
+
 			meet := false
 			fp.Provider().Dependencies().Iterate(func(dep Dependency) bool {
 				if dep.Name() == "p0" {
@@ -540,20 +569,15 @@ func Test_funcProvider_StructProviderBuilder(t *testing.T) {
 		t.Run("Tags", func(t *testing.T) {
 			fp := fp0.clone()
 			fp.Param(0, ByName("p0"), ByTags(tag1))
-			meet := false
-			fp.Provider().Dependencies().Iterate(func(dep Dependency) bool {
-				if dep.Name() == "p0" {
-					meet = true
-					assert.Equal(t, newSymbolSet(tag1), dep.Tags())
-				}
-				return true
+			verifyDependencyWithName(t, fp.Provider().Dependencies(), "p0", func(t *testing.T, dep Dependency) {
+				assert.Equal(t, newSymbolSet(tag1), dep.Tags())
 			})
-			assert.True(t, meet)
 		})
 
 		t.Run("param not exist", func(t *testing.T) {
 			fp := fp0.clone()
 			fp.Param(4, ByName("p4"))
+
 			meet := false
 			fp.Provider().Dependencies().Iterate(func(dep Dependency) bool {
 				if dep.Name() == "p0" {
@@ -569,46 +593,26 @@ func Test_funcProvider_StructProviderBuilder(t *testing.T) {
 		t.Run("SetIgnore", func(t *testing.T) {
 			fp := fp0.clone()
 			fp.Return(0, Name("r1"), Ignore())
-			meet := false
-			fp.Provider().Components().Iterate(func(com Component) bool {
-				if com.Name() == "r1" {
-					meet = true
-					assert.True(t, com.Ignored())
-				}
-				return true
-			})
 
-			assert.True(t, meet)
+			verifyComponentWithName(t, fp.Provider().Components(), "r1", func(t *testing.T, com Component) {
+				assert.True(t, com.Ignored())
+			})
 		})
 
 		t.Run("SetHidden", func(t *testing.T) {
 			fp := fp0.clone()
 			fp.Return(0, Name("r1"), Hide())
-			meet := false
-			fp.Provider().Components().Iterate(func(com Component) bool {
-				if com.Name() == "r1" {
-					meet = true
-					assert.True(t, com.Hidden())
-				}
-				return true
+			verifyComponentWithName(t, fp.Provider().Components(), "r1", func(t *testing.T, com Component) {
+				assert.True(t, com.Hidden())
 			})
-
-			assert.True(t, meet)
 		})
 
 		t.Run("AddAs", func(t *testing.T) {
 			fp := fp0.clone()
 			fp.Return(0, Name("r1"), As(TypeOf((*testInterface)(nil))))
-			meet := false
-			fp.Provider().Components().Iterate(func(com Component) bool {
-				if com.Name() == "r1" {
-					meet = true
-					assert.Equal(t, newTypeSet(TypeOf((*testInterface)(nil))), com.As())
-				}
-				return true
+			verifyComponentWithName(t, fp.Provider().Components(), "r1", func(t *testing.T, com Component) {
+				assert.Equal(t, newTypeSet(TypeOf((*testInterface)(nil))), com.As())
 			})
-
-			assert.True(t, meet)
 		})
 
 		t.Run("SetName", func(t *testing.T) {
@@ -628,16 +632,9 @@ func Test_funcProvider_StructProviderBuilder(t *testing.T) {
 		t.Run("AddTags", func(t *testing.T) {
 			fp := fp0.clone()
 			fp.Return(0, Name("r1"), Tags(tag1))
-			meet := false
-			fp.Provider().Components().Iterate(func(com Component) bool {
-				if com.Name() == "r1" {
-					meet = true
-					assert.Equal(t, newSymbolSet(tag1), com.Tags())
-				}
-				return true
+			verifyComponentWithName(t, fp.Provider().Components(), "r1", func(t *testing.T, com Component) {
+				assert.Equal(t, newSymbolSet(tag1), com.Tags())
 			})
-
-			assert.True(t, meet)
 		})
 
 		t.Run("return not exist", func(t *testing.T) {
